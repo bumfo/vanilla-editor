@@ -72,12 +72,12 @@ class Editor {
 
         const deleteSelectionBtn = document.createElement('button');
         deleteSelectionBtn.className = 'toolbar-btn action-btn';
-        deleteSelectionBtn.textContent = 'Delete Selection';
+        deleteSelectionBtn.textContent = 'Delete';
         deleteSelectionBtn.addEventListener('mousedown', (e) => e.preventDefault());
         deleteSelectionBtn.addEventListener('click', () => this.deleteSelection());
 
-        actionGroup.appendChild(splitBtn);
-        actionGroup.appendChild(mergeBtn);
+        // actionGroup.appendChild(splitBtn);
+        // actionGroup.appendChild(mergeBtn);
         actionGroup.appendChild(deleteSelectionBtn);
 
         // Add groups to toolbar
