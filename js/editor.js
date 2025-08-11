@@ -538,17 +538,3 @@ class Editor {
 }
 
 export default Editor;
-
-// Initialize the editor when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-    const editorElement = document.getElementById('editor');
-    if (editorElement) {
-        const editor = new Editor(editorElement);
-        console.log('Editor initialized', editor.getStats());
-
-        // Optional: expose editor for debugging (can be removed in production)
-        if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-            window.editor = editor;
-        }
-    }
-});
