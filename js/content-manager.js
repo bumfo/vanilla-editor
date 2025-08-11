@@ -82,7 +82,7 @@ class ContentManager {
                     mutation.mergeOffset = startOffset;
                     
                     // Apply content extraction
-                    DOMOperations.applyExtractContent(startBlock, mutation.domCache);
+                    DOMOperations.applyExtractContent(startBlock, mutation.domCache, mutation._isReplay);
                 } else {
                     // Multi-block deletion - complex merge operation
                     
@@ -124,7 +124,7 @@ class ContentManager {
                         return fragment;
                     };
                     
-                    DOMOperations.getCachedFragment('merged', createMergedFn, mutation.domCache);
+                    DOMOperations.getCachedNodes('merged', createMergedFn, mutation.domCache);
                     
                     // Remove intermediate blocks
                     mutation.deletedBlocks.forEach(blockInfo => {
@@ -132,7 +132,7 @@ class ContentManager {
                     });
                     
                     // Apply merged content to start block
-                    DOMOperations.populateBlock(startBlock, 'merged', () => document.createDocumentFragment(), mutation.domCache);
+                    DOMOperations.populateBlock(startBlock, 'merged', () => document.createDocumentFragment(), mutation.domCache, mutation._isReplay);
                     
                     // Remove end block (but keep reference for revert)
                     endBlock.remove();

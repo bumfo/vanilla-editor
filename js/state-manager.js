@@ -28,6 +28,7 @@ class StateManager {
      * @returns {boolean} - Whether the mutation was committed successfully
      */
     commit(mutation) {
+        mutation._isReplay = false;
         return this._executeMutation(mutation, false, true);
     }
 
@@ -37,6 +38,7 @@ class StateManager {
      * @returns {boolean} - Whether the mutation was replayed successfully
      */
     replay(mutation) {
+        mutation._isReplay = true;
         return this._executeMutation(mutation, false, false);
     }
 

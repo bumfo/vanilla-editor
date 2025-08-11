@@ -128,10 +128,10 @@ class BlockManager {
                     mutation.splitData = splitData;
 
                     // Apply split to first block
-                    DOMOperations.applySplitToFirstBlock(block, mutation.domCache);
+                    DOMOperations.applySplitToFirstBlock(block, mutation.domCache, mutation._isReplay);
                     
                     // Populate new block with after-split content
-                    DOMOperations.populateAfterSplitBlock(newBlock, mutation.domCache);
+                    DOMOperations.populateAfterSplitBlock(newBlock, mutation.domCache, mutation._isReplay);
                 }
 
                 // Insert new block after original
@@ -219,7 +219,7 @@ class BlockManager {
                 mutation.caretStateAfter = CaretState.collapsed(mutation.firstBlockIndex, mutation.mergeOffset);
 
                 // Apply merge using DOMOperations
-                DOMOperations.applyMergeBlocks(firstBlock, mutation.domCache);
+                DOMOperations.applyMergeBlocks(firstBlock, mutation.domCache, mutation._isReplay);
 
                 // Remove second block (but keep reference for revert)
                 secondBlock.remove();

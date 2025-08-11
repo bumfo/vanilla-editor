@@ -24,29 +24,24 @@ class DOMOperations {
     }
     
     /**
-     * Create a cached document fragment
-     * @param {string} cacheKey - Unique key for this cached fragment
-     * @param {Function} createFn - Function to create the fragment if not cached
+     * Get cached nodes (preserving node identity across operations)
+     * @param {string} cacheKey - Unique key for this cached node array
+     * @param {Function} createFn - Function to create the fragment if not cached (returns DocumentFragment)
      * @param {Object} cache - Cache object (mutation.domCache)
-     * @returns {DocumentFragment} The cached or newly created fragment
+     * @param {boolean} debugReplay - Debug flag to track replay operations (not used in logic)
+     * @returns {Array<Node>} Array of DOM nodes with preserved identity
      */
-    static getCachedFragment(cacheKey, createFn, cache) {
-        if (!cache._fragments) cache._fragments = new Map();
+    static getCachedNodes(cacheKey, createFn, cache, debugReplay = false) {
+        if (!cache._nodeArrays) cache._nodeArrays = new Map();
         
-        if (!cache._fragments.has(cacheKey)) {
-            cache._fragments.set(cacheKey, createFn());
+        if (!cache._nodeArrays.has(cacheKey)) {
+            const fragment = createFn();
+            // Extract and store the actual nodes (fragment will become empty)
+            const nodeArray = Array.from(fragment.childNodes);
+            cache._nodeArrays.set(cacheKey, nodeArray);
         }
         
-        // Clone the fragment by recreating it
-        const originalFragment = cache._fragments.get(cacheKey);
-        const clonedFragment = document.createDocumentFragment();
-        
-        // Clone all child nodes from the original fragment
-        for (const node of originalFragment.childNodes) {
-            clonedFragment.appendChild(node.cloneNode(true));
-        }
-        
-        return clonedFragment;
+        return cache._nodeArrays.get(cacheKey);
     }
     
     /**
@@ -60,21 +55,30 @@ class DOMOperations {
     }
     
     /**
-     * Populate block with cached content
+     * Populate block with cached nodes (preserving node identity)
      * @param {Element} block - Target block
      * @param {string} cacheKey - Cache key for the content
      * @param {Function} createContentFn - Function to create content if not cached
      * @param {Object} cache - Cache object
+     * @param {boolean} debugReplay - Debug flag (not used in logic)
      */
-    static populateBlock(block, cacheKey, createContentFn, cache) {
+    static populateBlock(block, cacheKey, createContentFn, cache, debugReplay = false) {
         this.clearBlock(block);
-        const fragment = this.getCachedFragment(cacheKey, createContentFn, cache);
-        block.appendChild(fragment);
+        const nodes = this.getCachedNodes(cacheKey, createContentFn, cache, debugReplay);
+        
+        // Move nodes to the target block (detaching from current parents)
+        nodes.forEach(node => {
+            if (node.parentNode) {
+                node.parentNode.removeChild(node);
+            }
+            block.appendChild(node);
+        });
+        
         this.normalizeBlock(block);
     }
     
     /**
-     * Store original block content for revert operations
+     * Store original block content for revert operations (creates new nodes to preserve current state)
      * @param {Element} block - Block to capture
      * @param {string} cacheKey - Cache key for storage
      * @param {Object} cache - Cache object
@@ -89,11 +93,11 @@ class DOMOperations {
         };
         
         // Force creation and caching of original content
-        this.getCachedFragment(cacheKey, createOriginalFn, cache);
+        this.getCachedNodes(cacheKey, createOriginalFn, cache);
     }
     
     /**
-     * Restore block content from cache
+     * Restore block content from cache (moves cached nodes to block)
      * @param {Element} block - Block to restore
      * @param {string} cacheKey - Cache key for the content
      * @param {Object} cache - Cache object
@@ -101,9 +105,14 @@ class DOMOperations {
     static restoreBlockContent(block, cacheKey, cache) {
         this.clearBlock(block);
         
-        if (cache._fragments && cache._fragments.has(cacheKey)) {
-            const fragment = this.getCachedFragment(cacheKey, () => document.createDocumentFragment(), cache);
-            block.appendChild(fragment);
+        if (cache._nodeArrays && cache._nodeArrays.has(cacheKey)) {
+            const nodes = cache._nodeArrays.get(cacheKey);
+            nodes.forEach(node => {
+                if (node.parentNode) {
+                    node.parentNode.removeChild(node);
+                }
+                block.appendChild(node);
+            });
         }
         
         this.normalizeBlock(block);
@@ -139,8 +148,8 @@ class DOMOperations {
         };
         
         // Pre-cache the split content
-        this.getCachedFragment(beforeKey, createBeforeFn, cache);
-        this.getCachedFragment(afterKey, createAfterFn, cache);
+        this.getCachedNodes(beforeKey, createBeforeFn, cache);
+        this.getCachedNodes(afterKey, createAfterFn, cache);
         
         return {
             originalTextLength: this.getTextLength(block),
@@ -152,18 +161,20 @@ class DOMOperations {
      * Apply split - update first block with before content
      * @param {Element} block - Block to update
      * @param {Object} cache - Cache object
+     * @param {boolean} isReplay - True if this is a replay/redo operation
      */
-    static applySplitToFirstBlock(block, cache) {
-        this.populateBlock(block, 'beforeSplit', () => document.createDocumentFragment(), cache);
+    static applySplitToFirstBlock(block, cache, isReplay = false) {
+        this.populateBlock(block, 'beforeSplit', () => document.createDocumentFragment(), cache, isReplay);
     }
     
     /**
      * Populate new block with after-split content
      * @param {Element} newBlock - New block to populate
      * @param {Object} cache - Cache object
+     * @param {boolean} isReplay - True if this is a replay/redo operation
      */
-    static populateAfterSplitBlock(newBlock, cache) {
-        this.populateBlock(newBlock, 'afterSplit', () => document.createDocumentFragment(), cache);
+    static populateAfterSplitBlock(newBlock, cache, isReplay = false) {
+        this.populateBlock(newBlock, 'afterSplit', () => document.createDocumentFragment(), cache, isReplay);
     }
     
     /**
@@ -204,7 +215,7 @@ class DOMOperations {
             return fragment;
         };
         
-        this.getCachedFragment('merged', createMergedFn, cache);
+        this.getCachedNodes('merged', createMergedFn, cache);
         
         return {
             mergeOffset: this.getTextLength(firstBlock)
@@ -215,9 +226,10 @@ class DOMOperations {
      * Apply merge operation
      * @param {Element} firstBlock - Target block to receive merged content
      * @param {Object} cache - Cache object
+     * @param {boolean} isReplay - True if this is a replay/redo operation
      */
-    static applyMergeBlocks(firstBlock, cache) {
-        this.populateBlock(firstBlock, 'merged', () => document.createDocumentFragment(), cache);
+    static applyMergeBlocks(firstBlock, cache, isReplay = false) {
+        this.populateBlock(firstBlock, 'merged', () => document.createDocumentFragment(), cache, isReplay);
     }
     
     /**
@@ -251,7 +263,7 @@ class DOMOperations {
             return fragment;
         };
         
-        this.getCachedFragment('remaining', createRemainingFn, cache);
+        this.getCachedNodes('remaining', createRemainingFn, cache);
         
         return {
             startOffset,
@@ -263,9 +275,10 @@ class DOMOperations {
      * Apply content extraction
      * @param {Element} block - Block to update
      * @param {Object} cache - Cache object
+     * @param {boolean} isReplay - True if this is a replay/redo operation
      */
-    static applyExtractContent(block, cache) {
-        this.populateBlock(block, 'remaining', () => document.createDocumentFragment(), cache);
+    static applyExtractContent(block, cache, isReplay = false) {
+        this.populateBlock(block, 'remaining', () => document.createDocumentFragment(), cache, isReplay);
     }
     
     /**
