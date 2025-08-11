@@ -34,22 +34,18 @@ class ContentManager {
         // Delete content handler (using CaretTracker for positioning)
         this.stateManager.registerHandler('deleteContent', {
             apply: (mutation) => {
-                const { startCaretState, endCaretState } = mutation;
+                const { rangeCaretState } = mutation;
 
-                // Convert caret states to DOM ranges using CaretTracker
-                const startRange = this.caretTracker.createRangeFromCaretState(startCaretState);
-                const endRange = this.caretTracker.createRangeFromCaretState(endCaretState);
-
-                if (!startRange || !endRange) return;
-
-                // Create a range spanning the selection
-                const deleteRange = document.createRange();
-                deleteRange.setStart(startRange.startContainer, startRange.startOffset);
-                deleteRange.setEnd(endRange.startContainer, endRange.startOffset);
+                // Convert caret state to DOM range using CaretTracker
+                const deleteRange = this.caretTracker.createRangeFromCaretState(rangeCaretState);
+                if (!deleteRange) return;
 
                 // Store deleted content for revert
                 mutation.deletedContents = deleteRange.cloneContents();
-                mutation.restorePosition = startCaretState;
+                mutation.restorePosition = CaretState.collapsed(
+                    rangeCaretState.startBlockIndex, 
+                    rangeCaretState.startOffset
+                );
 
                 // Delete the contents
                 deleteRange.deleteContents();
@@ -123,13 +119,15 @@ class ContentManager {
             const startPos = this.caretTracker.getLogicalPosition(range.startContainer, range.startOffset);
             const endPos = this.caretTracker.getLogicalPosition(range.endContainer, range.endOffset);
 
-            const startCaretState = CaretState.collapsed(startPos.blockIndex, startPos.offset);
-            const endCaretState = CaretState.collapsed(endPos.blockIndex, endPos.offset);
+            // Use single CaretState with endBlockIndex for the range
+            const rangeCaretState = CaretState.range(
+                startPos.blockIndex, startPos.offset,
+                endPos.blockIndex, endPos.offset
+            );
 
             return this.stateManager.commit({
                 type: 'deleteContent',
-                startCaretState: startCaretState,
-                endCaretState: endCaretState,
+                rangeCaretState: rangeCaretState,
             });
         } catch (error) {
             console.warn('Failed to delete selection:', error);

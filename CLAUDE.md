@@ -46,8 +46,9 @@ This is a custom rich text editor built with vanilla HTML, CSS, and JavaScript. 
   - Inline apply/revert functions for clean implementation
 
 - **ContentManager**: Text and range operations
-  - Self-registers handlers: `textContent`, `deleteContent`
-  - Handles text content changes and range deletions
+  - Self-registers handlers: `textContent`, `deleteContent`, `insertContent`
+  - High-level methods: `deleteSelection()`, `insertAtCursor()`
+  - Uses CaretState ranges for multi-block selections
 
 - **SelectionManager**: Selection and cursor management
   - `saveSelection()` / `restoreSelection()`: Preserves cursor across operations
@@ -58,6 +59,22 @@ This is a custom rich text editor built with vanilla HTML, CSS, and JavaScript. 
   - DOM-based index tracking (no separate currentIndex variable)
   - Listens only to commit events (no circular dependencies)
   - Direct `revert()` for undo, `replay()` for redo
+
+#### Basic Utility Classes
+
+- **CaretState**: Logical caret position representation
+  - Properties: `startBlockIndex`, `startOffset`, `endBlockIndex`, `endOffset`, `isCollapsed`
+  - Static constructors: `CaretState.collapsed(blockIndex, offset)` for single position
+  - Static constructors: `CaretState.range(startBlockIndex, startOffset, endBlockIndex, endOffset)` for selections
+  - Methods: `isValid(editor)`, `createFallback(editor)`, `clone()`, `toString()`
+  - Immune to DOM changes, uses block indices instead of DOM references
+
+- **CaretTracker**: Converts between DOM Ranges and CaretState
+  - `captureCaretState()`: Get current caret position as CaretState
+  - `restoreCaretState(caretState)`: Apply CaretState to DOM selection
+  - `createRangeFromCaretState(caretState)`: Convert logical position to DOM Range
+  - `getLogicalPosition(node, offset)`: Convert DOM position to block index + text offset
+  - Handles complex DOM traversal and text offset calculations
 
 ### Mutation Flow
 
@@ -110,6 +127,8 @@ editor/
 │   ├── content-manager.js   # Text/range operations
 │   ├── selection-manager.js # Selection/cursor management
 │   ├── history-manager.js   # Undo/redo functionality
+│   ├── caret-tracker.js     # CaretState and CaretTracker classes
+│   ├── carets.js           # Caret utility functions
 │   └── block-text.js        # Text position utilities
 └── css/
     └── editor.css           # Editor styles
