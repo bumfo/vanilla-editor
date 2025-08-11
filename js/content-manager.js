@@ -1,3 +1,5 @@
+import { DELETE_CONTENT, INSERT_CONTENT } from './mutation-types.js';
+
 /**
  * Content Manager - Handles text content and range operations
  */
@@ -49,7 +51,7 @@ class ContentManager {
         });
 
         // Delete content handler (handles multi-block deletion like mergeBlocks)
-        this.stateManager.registerHandler('deleteContent', {
+        this.stateManager.registerHandler(DELETE_CONTENT, {
             apply: (mutation) => {
                 const { rangeCaretState } = mutation;
                 const blocks = Array.from(this.editor.children);
@@ -182,7 +184,7 @@ class ContentManager {
         });
 
         // Insert content handler (using CaretTracker for positioning)
-        this.stateManager.registerHandler('insertContent', {
+        this.stateManager.registerHandler(INSERT_CONTENT, {
             apply: (mutation) => {
                 const { caretState, content } = mutation;
 
@@ -244,7 +246,7 @@ class ContentManager {
             );
 
             return this.stateManager.commit({
-                type: 'deleteContent',
+                type: DELETE_CONTENT,
                 rangeCaretState: rangeCaretState,
             });
         } catch (error) {
@@ -274,7 +276,7 @@ class ContentManager {
             const caretState = CaretState.collapsed(currentPos.blockIndex, currentPos.offset);
 
             return this.stateManager.commit({
-                type: 'insertContent',
+                type: INSERT_CONTENT,
                 caretState: caretState,
                 content: content,
             });
@@ -285,5 +287,6 @@ class ContentManager {
     }
 }
 
-// Export as global
+// Export as global and ES module
 window.ContentManager = ContentManager;
+export default ContentManager;

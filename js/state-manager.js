@@ -147,5 +147,6 @@ class StateManager {
     }
 }
 
-// Export as global for use in other modules
+// Export as global and ES module
 window.StateManager = StateManager;
+export default StateManager;

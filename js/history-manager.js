@@ -1,3 +1,5 @@
+import { SPLIT_BLOCK, MERGE_BLOCKS } from './mutation-types.js';
+
 /**
  * History Manager - Manages undo/redo functionality for mutations
  * Uses a hidden contenteditable element to hook into browser's native undo/redo
@@ -82,13 +84,13 @@ class HistoryManager {
     onMutationCommit(mutation, eventType) {
         if (eventType === 'commit') {
             // Skip automatic caret capture for structural operations that handle their own caret positioning
-            // if (mutation.type !== 'splitBlock' && mutation.type !== 'mergeBlocks') {
+            // if (mutation.type !== SPLIT_BLOCK && mutation.type !== MERGE_BLOCKS) {
             // Capture caret state after mutation for redo
             mutation.caretStateAfter = this.caretTracker.captureCaretState();
             // }
 
             // Adjust existing caret states in history for structural changes
-            // if (mutation.type === 'splitBlock' || mutation.type === 'mergeBlocks') {
+            // if (mutation.type === SPLIT_BLOCK || mutation.type === MERGE_BLOCKS) {
             //     this.adjustHistoryCaretStates(mutation);
             // }
 
@@ -102,11 +104,11 @@ class HistoryManager {
     adjustHistoryCaretStates(mutation) {
         this.historyStack.forEach(historyMutation => {
             if (historyMutation.caretStateBefore) {
-                if (mutation.type === 'splitBlock') {
+                if (mutation.type === SPLIT_BLOCK) {
                     historyMutation.caretStateBefore = Carets.adjustCaretStateAfterSplit(
                         historyMutation.caretStateBefore, mutation,
                     );
-                } else if (mutation.type === 'mergeBlocks') {
+                } else if (mutation.type === MERGE_BLOCKS) {
                     historyMutation.caretStateBefore = Carets.adjustCaretStateAfterMerge(
                         historyMutation.caretStateBefore, mutation,
                     );
@@ -114,11 +116,11 @@ class HistoryManager {
             }
 
             if (historyMutation.caretStateAfter) {
-                if (mutation.type === 'splitBlock') {
+                if (mutation.type === SPLIT_BLOCK) {
                     historyMutation.caretStateAfter = Carets.adjustCaretStateAfterSplit(
                         historyMutation.caretStateAfter, mutation,
                     );
-                } else if (mutation.type === 'mergeBlocks') {
+                } else if (mutation.type === MERGE_BLOCKS) {
                     historyMutation.caretStateAfter = Carets.adjustCaretStateAfterMerge(
                         historyMutation.caretStateAfter, mutation,
                     );
@@ -303,5 +305,6 @@ class HistoryManager {
     }
 }
 
-// Export as global
+// Export as global and ES module
 window.HistoryManager = HistoryManager;
+export default HistoryManager;

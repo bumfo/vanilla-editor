@@ -327,5 +327,6 @@ const BlockText = (() => {
     return { isAtBlockStart, isAtBlockEnd, getVisibleOffsetFromBlockStart };
 })();
 
-// Export as global
+// Export as global and ES module
 window.BlockText = BlockText;
+export default BlockText;

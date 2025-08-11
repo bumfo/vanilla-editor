@@ -1,3 +1,12 @@
+import {
+    FORMAT_BLOCK,
+    REMOVE_ELEMENT,
+    SPLIT_BLOCK,
+    DELETE_BLOCK,
+    MERGE_BLOCKS,
+    INSERT_ELEMENT
+} from './mutation-types.js';
+
 /**
  * Block Manager - Handles block-level operations for the editor
  */
@@ -45,7 +54,7 @@ class BlockManager {
      */
     registerHandlers() {
         // Format block handler
-        this.stateManager.registerHandler('formatBlock', {
+        this.stateManager.registerHandler(FORMAT_BLOCK, {
             apply: (mutation) => {
                 const { element, newElement } = mutation;
                 
@@ -82,7 +91,7 @@ class BlockManager {
         });
 
         // Insert element handler
-        this.stateManager.registerHandler('insertElement', {
+        this.stateManager.registerHandler(INSERT_ELEMENT, {
             apply: (mutation) => {
                 const { element, parent, before } = mutation;
                 parent.insertBefore(element, before || null);
@@ -92,7 +101,7 @@ class BlockManager {
         });
 
         // Remove element handler
-        this.stateManager.registerHandler('removeElement', {
+        this.stateManager.registerHandler(REMOVE_ELEMENT, {
             apply: (mutation) => {
                 const { element } = mutation;
                 mutation.parent = element.parentNode;
@@ -107,7 +116,7 @@ class BlockManager {
         });
 
         // Split block handler
-        this.stateManager.registerHandler('splitBlock', {
+        this.stateManager.registerHandler(SPLIT_BLOCK, {
             apply: (mutation) => {
                 const { block, splitOffset, newBlock, atEnd } = mutation;
 
@@ -164,7 +173,7 @@ class BlockManager {
         });
 
         // Delete block handler (just remove block)
-        this.stateManager.registerHandler('deleteBlock', {
+        this.stateManager.registerHandler(DELETE_BLOCK, {
             apply: (mutation) => {
                 const { block } = mutation;
 
@@ -197,7 +206,7 @@ class BlockManager {
         });
 
         // Merge blocks handler  
-        this.stateManager.registerHandler('mergeBlocks', {
+        this.stateManager.registerHandler(MERGE_BLOCKS, {
             apply: (mutation) => {
                 const { firstBlock, secondBlock } = mutation;
 
@@ -307,7 +316,7 @@ class BlockManager {
         const newElement = DOMOperations.createElement(tagName.toUpperCase());
 
         return this.stateManager.commit({
-            type: 'formatBlock',
+            type: FORMAT_BLOCK,
             element: block,
             newElement: newElement,
         });
@@ -323,7 +332,7 @@ class BlockManager {
         if (!this.isBlock(block)) return false;
 
         return this.stateManager.commit({
-            type: 'removeElement',
+            type: REMOVE_ELEMENT,
             element: block,
         });
     }
@@ -342,7 +351,7 @@ class BlockManager {
         const newBlock = DOMOperations.createElement(newBlockTag || block.tagName);
 
         const success = this.stateManager.commit({
-            type: 'splitBlock',
+            type: SPLIT_BLOCK,
             block: block,
             splitOffset: offset,
             newBlock: newBlock,
@@ -373,7 +382,7 @@ class BlockManager {
         }
 
         const success = this.stateManager.commit({
-            type: 'splitBlock',
+            type: SPLIT_BLOCK,
             block: block,
             atEnd: true,
             newBlock: newBlock,
@@ -394,7 +403,7 @@ class BlockManager {
         if (!this.isBlock(block)) return false;
 
         return this.stateManager.commit({
-            type: 'deleteBlock',
+            type: DELETE_BLOCK,
             block: block,
         });
     }
@@ -410,7 +419,7 @@ class BlockManager {
         if (firstBlock.nextElementSibling !== secondBlock) return false;
 
         return this.stateManager.commit({
-            type: 'mergeBlocks',
+            type: MERGE_BLOCKS,
             firstBlock: firstBlock,
             secondBlock: secondBlock,
         });
@@ -484,11 +493,11 @@ class BlockManager {
         // Apply both mutations
         // Note: In a real implementation, this might be a single composite mutation
         if (this.stateManager.commit({
-            type: 'removeElement',
+            type: REMOVE_ELEMENT,
             element: block,
         })) {
             return this.stateManager.commit({
-                type: 'insertElement',
+                type: INSERT_ELEMENT,
                 element: block,
                 parent: this.editor,
                 before: beforeBlock,
@@ -499,5 +508,6 @@ class BlockManager {
     }
 }
 
-// Export as global
+// Export as global and ES module
 window.BlockManager = BlockManager;
+export default BlockManager;

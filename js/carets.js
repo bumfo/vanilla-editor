@@ -120,5 +120,6 @@ class Carets {
     }
 }
 
-// Export as global
+// Export as global and ES module
 window.Carets = Carets;
+export default Carets;

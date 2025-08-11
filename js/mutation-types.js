@@ -1,0 +1,8 @@
+export const FORMAT_BLOCK = 'FORMAT_BLOCK';
+export const REMOVE_ELEMENT = 'REMOVE_ELEMENT';
+export const SPLIT_BLOCK = 'SPLIT_BLOCK';
+export const DELETE_BLOCK = 'DELETE_BLOCK';
+export const MERGE_BLOCKS = 'MERGE_BLOCKS';
+export const INSERT_ELEMENT = 'INSERT_ELEMENT';
+export const DELETE_CONTENT = 'DELETE_CONTENT';
+export const INSERT_CONTENT = 'INSERT_CONTENT';

@@ -1,3 +1,5 @@
+import { INSERT_ELEMENT, REMOVE_ELEMENT } from './mutation-types.js';
+
 /**
  * Main Editor Application
  * Ties together all the managers and sets up the editor
@@ -474,7 +476,7 @@ class Editor {
         if (!this.p4 || this.element.contains(this.p4)) return false;
 
         return this.stateManager.commit({
-            type: 'insertElement',
+            type: INSERT_ELEMENT,
             element: this.p4,
             parent: this.element,
             before: null,
@@ -488,7 +490,7 @@ class Editor {
         if (!this.p4 || !this.element.contains(this.p4)) return false;
 
         return this.stateManager.commit({
-            type: 'removeElement',
+            type: REMOVE_ELEMENT,
             element: this.p4,
         });
     }
@@ -528,6 +530,10 @@ class Editor {
         this.historyManager.destroy();
     }
 }
+
+// Export as global and ES module
+window.Editor = Editor;
+export default Editor;
 
 // Initialize the editor when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
