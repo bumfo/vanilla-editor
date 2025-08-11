@@ -1,4 +1,10 @@
 import { INSERT_ELEMENT, REMOVE_ELEMENT } from './mutation-types.js';
+import { CaretTracker } from './caret-tracker.js';
+import StateManager from './state-manager.js';
+import BlockManager from './block-manager.js';
+import HistoryManager from './history-manager.js';
+import ContentManager from './content-manager.js';
+import DOMOperations from './dom-operations.js';
 
 /**
  * Main Editor Application
@@ -531,8 +537,6 @@ class Editor {
     }
 }
 
-// Export as global and ES module
-window.Editor = Editor;
 export default Editor;
 
 // Initialize the editor when DOM is ready

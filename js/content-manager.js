@@ -1,4 +1,7 @@
 import { DELETE_CONTENT, INSERT_CONTENT } from './mutation-types.js';
+import { CaretState } from './caret-tracker.js';
+import Carets from './carets.js';
+import DOMOperations from './dom-operations.js';
 
 /**
  * Content Manager - Handles text content and range operations
@@ -287,6 +290,4 @@ class ContentManager {
     }
 }
 
-// Export as global and ES module
-window.ContentManager = ContentManager;
 export default ContentManager;

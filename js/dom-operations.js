@@ -524,6 +524,4 @@ class DOMOperations {
     }
 }
 
-// Export as global and ES module
-window.DOMOperations = DOMOperations;
 export default DOMOperations;

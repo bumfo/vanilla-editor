@@ -6,6 +6,9 @@ import {
     MERGE_BLOCKS,
     INSERT_ELEMENT
 } from './mutation-types.js';
+import { CaretState } from './caret-tracker.js';
+import Carets from './carets.js';
+import DOMOperations from './dom-operations.js';
 
 /**
  * Block Manager - Handles block-level operations for the editor
@@ -508,6 +511,4 @@ class BlockManager {
     }
 }
 
-// Export as global and ES module
-window.BlockManager = BlockManager;
 export default BlockManager;

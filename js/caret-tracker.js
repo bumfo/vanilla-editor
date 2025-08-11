@@ -425,7 +425,4 @@ class CaretTracker {
 
 }
 
-// Export as globals and ES modules
-window.CaretState = CaretState;
-window.CaretTracker = CaretTracker;
 export { CaretState, CaretTracker };

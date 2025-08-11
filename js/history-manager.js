@@ -1,4 +1,5 @@
 import { SPLIT_BLOCK, MERGE_BLOCKS } from './mutation-types.js';
+import { CaretState } from './caret-tracker.js';
 
 /**
  * History Manager - Manages undo/redo functionality for mutations
@@ -305,6 +306,4 @@ class HistoryManager {
     }
 }
 
-// Export as global and ES module
-window.HistoryManager = HistoryManager;
 export default HistoryManager;
