@@ -5,6 +5,7 @@ import BlockManager from './block-manager.js';
 import HistoryManager from './history-manager.js';
 import ContentManager from './content-manager.js';
 import DOMOperations from './dom-operations.js';
+import Carets from './carets.js';
 
 /**
  * Main Editor Application

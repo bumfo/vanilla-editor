@@ -1,3 +1,5 @@
+import Carets from './carets.js';
+
 /**
  * Caret State - Represents logical caret position using block indices and text offsets
  * This representation is immune to DOM changes and can be reliably restored
