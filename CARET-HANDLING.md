@@ -2,10 +2,11 @@
 
 ## Core Principles
 
-### 1. Caret Handling in Mutations Only
-- **DO**: Handle caret positioning in mutation `apply` handlers
-- **DON'T**: Handle caret positioning in mutation `revert` handlers (handled by history system)
+### 1. Caret Handling in Mutation Handlers Only
+- **DO**: Handle caret positioning in the handler's `apply` method
+- **DON'T**: Handle caret positioning in the handler's `revert` method (handled by history system)
 - **DON'T**: Handle caret positioning in high-level methods (Editor class methods)
+- **DON'T**: Put caret logic in mutation instances (they're just data)
 
 ### 2. Mutation Apply Handlers
 Caret handling should be done in the `apply` handler when:
