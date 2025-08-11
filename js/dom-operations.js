@@ -56,7 +56,7 @@ class DOMOperations {
      * @param {string} cacheKey - Unique key for this cached node
      * @param {Function} createFn - Function to create the node if not cached
      * @param {Object} cache - Cache object (mutation.domCache)
-     * @returns {Node} The cached or newly created node
+     * @returns {Node} The actual cached node (same object identity)
      */
     static getCachedNode(cacheKey, createFn, cache) {
         if (!cache._nodes) cache._nodes = new Map();
@@ -65,13 +65,13 @@ class DOMOperations {
             cache._nodes.set(cacheKey, createFn());
         }
         
-        return cache._nodes.get(cacheKey).cloneNode(true);
+        return cache._nodes.get(cacheKey);
     }
     
     /**
      * Get cached nodes (preserving node identity across operations)
      * @param {string} cacheKey - Unique key for this cached node array
-     * @param {Function} createFn - Function to create the fragment if not cached (returns DocumentFragment)
+     * @param {Function} createFn - Function to create the node array if not cached (returns Array<Node>)
      * @param {Object} cache - Cache object (mutation.domCache)
      * @returns {Array<Node>} Array of DOM nodes with preserved identity
      */
@@ -79,9 +79,7 @@ class DOMOperations {
         if (!cache._nodeArrays) cache._nodeArrays = new Map();
         
         if (!cache._nodeArrays.has(cacheKey)) {
-            const fragment = createFn();
-            // Extract and store the actual nodes (fragment will become empty)
-            const nodeArray = Array.from(fragment.childNodes);
+            const nodeArray = createFn();
             cache._nodeArrays.set(cacheKey, nodeArray);
         }
         
@@ -128,11 +126,7 @@ class DOMOperations {
      */
     static captureBlockContent(block, cacheKey, cache) {
         const createOriginalFn = () => {
-            const fragment = document.createDocumentFragment();
-            Array.from(block.childNodes).forEach(node => {
-                fragment.appendChild(node.cloneNode(true));
-            });
-            return fragment;
+            return Array.from(block.childNodes).map(node => node.cloneNode(true));
         };
         
         // Force creation and caching of original content
@@ -177,17 +171,13 @@ class DOMOperations {
         const afterKey = 'afterSplit';
         
         const createBeforeFn = () => {
-            const fragment = document.createDocumentFragment();
             const { beforeNodes } = this._calculateSplitContent(block, offset);
-            beforeNodes.forEach(node => fragment.appendChild(node));
-            return fragment;
+            return beforeNodes;
         };
         
         const createAfterFn = () => {
-            const fragment = document.createDocumentFragment();
             const { afterNodes } = this._calculateSplitContent(block, offset);
-            afterNodes.forEach(node => fragment.appendChild(node));
-            return fragment;
+            return afterNodes;
         };
         
         // Pre-cache the split content
@@ -206,7 +196,7 @@ class DOMOperations {
      * @param {Object} cache - Cache object
      */
     static applySplitToFirstBlock(block, cache) {
-        this.populateBlock(block, 'beforeSplit', () => document.createDocumentFragment(), cache);
+        this.populateBlock(block, 'beforeSplit', () => [], cache);
     }
     
     /**
@@ -215,7 +205,7 @@ class DOMOperations {
      * @param {Object} cache - Cache object
      */
     static populateAfterSplitBlock(newBlock, cache) {
-        this.populateBlock(newBlock, 'afterSplit', () => document.createDocumentFragment(), cache);
+        this.populateBlock(newBlock, 'afterSplit', () => [], cache);
     }
     
     /**
@@ -241,19 +231,19 @@ class DOMOperations {
         
         // Calculate and cache merged content
         const createMergedFn = () => {
-            const fragment = document.createDocumentFragment();
+            const mergedNodes = [];
             
             // Add first block content
             Array.from(firstBlock.childNodes).forEach(node => {
-                fragment.appendChild(node.cloneNode(true));
+                mergedNodes.push(node.cloneNode(true));
             });
             
             // Add second block content
             Array.from(secondBlock.childNodes).forEach(node => {
-                fragment.appendChild(node.cloneNode(true));
+                mergedNodes.push(node.cloneNode(true));
             });
             
-            return fragment;
+            return mergedNodes;
         };
         
         this.getCachedNodes('merged', createMergedFn, cache);
@@ -269,7 +259,7 @@ class DOMOperations {
      * @param {Object} cache - Cache object
      */
     static applyMergeBlocks(firstBlock, cache) {
-        this.populateBlock(firstBlock, 'merged', () => document.createDocumentFragment(), cache);
+        this.populateBlock(firstBlock, 'merged', () => [], cache);
     }
     
     /**
@@ -297,10 +287,8 @@ class DOMOperations {
         
         // Calculate and cache remaining content
         const createRemainingFn = () => {
-            const fragment = document.createDocumentFragment();
             const { remainingNodes } = this._calculateExtractContent(block, startOffset, endOffset);
-            remainingNodes.forEach(node => fragment.appendChild(node));
-            return fragment;
+            return remainingNodes;
         };
         
         this.getCachedNodes('remaining', createRemainingFn, cache);
@@ -317,7 +305,7 @@ class DOMOperations {
      * @param {Object} cache - Cache object
      */
     static applyExtractContent(block, cache) {
-        this.populateBlock(block, 'remaining', () => document.createDocumentFragment(), cache);
+        this.populateBlock(block, 'remaining', () => [], cache);
     }
     
     /**

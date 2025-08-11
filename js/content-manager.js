@@ -113,17 +113,17 @@ class ContentManager {
                     
                     // Create merged content: start block (0 to startOffset) + end block (endOffset to end)
                     const createMergedFn = () => {
-                        const fragment = document.createDocumentFragment();
+                        const mergedNodes = [];
                         
                         // Get content BEFORE the selection (0 to startOffset) from start block
                         const beforeSplit = DOMOperations.calculateSplitContent(startBlock, startOffset);
-                        beforeSplit.beforeNodes.forEach(node => fragment.appendChild(node));
+                        mergedNodes.push(...beforeSplit.beforeNodes);
                         
                         // Get content AFTER the selection (endOffset to end) from end block  
                         const afterSplit = DOMOperations.calculateSplitContent(endBlock, endOffset);
-                        afterSplit.afterNodes.forEach(node => fragment.appendChild(node));
+                        mergedNodes.push(...afterSplit.afterNodes);
                         
-                        return fragment;
+                        return mergedNodes;
                     };
                     
                     DOMOperations.getCachedNodes('merged', createMergedFn, mutation.domCache);
@@ -134,7 +134,7 @@ class ContentManager {
                     });
                     
                     // Apply merged content to start block
-                    DOMOperations.populateBlock(startBlock, 'merged', () => document.createDocumentFragment(), mutation.domCache);
+                    DOMOperations.populateBlock(startBlock, 'merged', () => [], mutation.domCache);
                     
                     // Remove end block (but keep reference for revert)
                     endBlock.remove();

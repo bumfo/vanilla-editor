@@ -77,7 +77,7 @@ This is a custom rich text editor built with vanilla HTML, CSS, and JavaScript. 
   - Handles complex DOM traversal and text offset calculations
 
 - **DOMOperations**: Low-level DOM manipulation preserving inline formatting
-  - **Black Box Caching**: Internal node/fragment caching for mutation history compatibility
+  - **Perfect Node Identity Caching**: Stores actual DOM nodes for reuse across undo/redo cycles
   - **3-Phase Pattern**: prepare → apply → revert operations for mutation system integration
   - **Split Operations**: `prepareSplitBlock()`, `applySplitToFirstBlock()`, `revertSplitBlock()`
   - **Merge Operations**: `prepareMergeBlocks()`, `applyMergeBlocks()`, `revertMergeBlocks()`
@@ -222,4 +222,48 @@ revert: (mutation) => {
     // Reuse same DOM element
     parent.insertBefore(mutation.removedElement, nextSibling);
 }
+```
+
+## DOM Node Caching Anti-Patterns
+
+**Critical Rule**: Perfect node identity preservation requires avoiding cloning and DocumentFragment complexity.
+
+### Anti-Pattern 1: Node Cloning
+```javascript
+// BAD: Cloning breaks node identity - creates new objects
+return cache._nodes.get(cacheKey).cloneNode(true);
+
+// GOOD: Return the actual cached node for reuse
+return cache._nodes.get(cacheKey);
+```
+
+### Anti-Pattern 2: DocumentFragment Indirection
+```javascript
+// BAD: Fragments become empty, requiring complex extraction logic
+const createContentFn = () => {
+    const fragment = document.createDocumentFragment();
+    nodes.forEach(node => fragment.appendChild(node));
+    return fragment; // Fragment will be empty after extraction
+};
+
+// GOOD: Return node arrays directly
+const createContentFn = () => {
+    return nodes.map(node => node.cloneNode(true)); // Only clone at creation time
+};
+```
+
+### Why These Patterns Break Identity
+- **Cloning**: Creates new DOM objects, breaking the core principle of reusing identical nodes
+- **DocumentFragments**: Become empty when nodes are moved, forcing complex extraction and indirection
+- **Performance**: Unnecessary object creation and DOM manipulation overhead
+- **Debugging**: Makes it impossible to verify that the same node objects are being reused
+
+### Correct Pattern: Direct Node Array Storage
+```javascript
+// Store actual nodes directly in arrays
+cache._nodeArrays.set(cacheKey, actualNodeArray);
+
+// Move the same node objects between DOM locations
+const nodes = cache._nodeArrays.get(cacheKey);
+nodes.forEach(node => targetElement.appendChild(node));
 ```
