@@ -6,6 +6,51 @@
  * The caching mechanism is internal - users just call methods and get properly cached/reusable nodes.
  */
 class DOMOperations {
+    // Static replay state for debugging (single-threaded safe)
+    static _isReplayMode = false;
+    
+    /**
+     * Set replay mode for debugging DOM node creation
+     * @param {boolean} isReplay - True if in replay mode
+     */
+    static setReplayMode(isReplay) {
+        this._isReplayMode = isReplay;
+    }
+    
+    /**
+     * Check if currently in replay mode
+     * @returns {boolean} True if in replay mode
+     */
+    static isReplayMode() {
+        return this._isReplayMode;
+    }
+    
+    /**
+     * Wrapper for document.createElement with replay mode validation
+     * @param {string} tagName - Element tag name
+     * @returns {Element} Created element
+     */
+    static createElement(tagName) {
+        if (this._isReplayMode) {
+            console.warn(`Warning: Creating element '${tagName}' during replay operation - this may break undo/redo`);
+            console.trace('createElement during replay');
+        }
+        return document.createElement(tagName);
+    }
+    
+    /**
+     * Wrapper for document.createTextNode with replay mode validation
+     * @param {string} text - Text content
+     * @returns {Text} Created text node
+     */
+    static createTextNode(text) {
+        if (this._isReplayMode) {
+            console.warn(`Warning: Creating text node '${text.substring(0, 50)}${text.length > 50 ? '...' : ''}' during replay operation - this may break undo/redo`);
+            console.trace('createTextNode during replay');
+        }
+        return document.createTextNode(text);
+    }
+    
     /**
      * Create a cached node that can be reused across apply/revert cycles
      * @param {string} cacheKey - Unique key for this cached node
@@ -28,10 +73,9 @@ class DOMOperations {
      * @param {string} cacheKey - Unique key for this cached node array
      * @param {Function} createFn - Function to create the fragment if not cached (returns DocumentFragment)
      * @param {Object} cache - Cache object (mutation.domCache)
-     * @param {boolean} debugReplay - Debug flag to track replay operations (not used in logic)
      * @returns {Array<Node>} Array of DOM nodes with preserved identity
      */
-    static getCachedNodes(cacheKey, createFn, cache, debugReplay = false) {
+    static getCachedNodes(cacheKey, createFn, cache) {
         if (!cache._nodeArrays) cache._nodeArrays = new Map();
         
         if (!cache._nodeArrays.has(cacheKey)) {
@@ -60,11 +104,10 @@ class DOMOperations {
      * @param {string} cacheKey - Cache key for the content
      * @param {Function} createContentFn - Function to create content if not cached
      * @param {Object} cache - Cache object
-     * @param {boolean} debugReplay - Debug flag (not used in logic)
      */
-    static populateBlock(block, cacheKey, createContentFn, cache, debugReplay = false) {
+    static populateBlock(block, cacheKey, createContentFn, cache) {
         this.clearBlock(block);
-        const nodes = this.getCachedNodes(cacheKey, createContentFn, cache, debugReplay);
+        const nodes = this.getCachedNodes(cacheKey, createContentFn, cache);
         
         // Move nodes to the target block (detaching from current parents)
         nodes.forEach(node => {
@@ -161,20 +204,18 @@ class DOMOperations {
      * Apply split - update first block with before content
      * @param {Element} block - Block to update
      * @param {Object} cache - Cache object
-     * @param {boolean} isReplay - True if this is a replay/redo operation
      */
-    static applySplitToFirstBlock(block, cache, isReplay = false) {
-        this.populateBlock(block, 'beforeSplit', () => document.createDocumentFragment(), cache, isReplay);
+    static applySplitToFirstBlock(block, cache) {
+        this.populateBlock(block, 'beforeSplit', () => document.createDocumentFragment(), cache);
     }
     
     /**
      * Populate new block with after-split content
      * @param {Element} newBlock - New block to populate
      * @param {Object} cache - Cache object
-     * @param {boolean} isReplay - True if this is a replay/redo operation
      */
-    static populateAfterSplitBlock(newBlock, cache, isReplay = false) {
-        this.populateBlock(newBlock, 'afterSplit', () => document.createDocumentFragment(), cache, isReplay);
+    static populateAfterSplitBlock(newBlock, cache) {
+        this.populateBlock(newBlock, 'afterSplit', () => document.createDocumentFragment(), cache);
     }
     
     /**
@@ -226,10 +267,9 @@ class DOMOperations {
      * Apply merge operation
      * @param {Element} firstBlock - Target block to receive merged content
      * @param {Object} cache - Cache object
-     * @param {boolean} isReplay - True if this is a replay/redo operation
      */
-    static applyMergeBlocks(firstBlock, cache, isReplay = false) {
-        this.populateBlock(firstBlock, 'merged', () => document.createDocumentFragment(), cache, isReplay);
+    static applyMergeBlocks(firstBlock, cache) {
+        this.populateBlock(firstBlock, 'merged', () => document.createDocumentFragment(), cache);
     }
     
     /**
@@ -275,10 +315,9 @@ class DOMOperations {
      * Apply content extraction
      * @param {Element} block - Block to update
      * @param {Object} cache - Cache object
-     * @param {boolean} isReplay - True if this is a replay/redo operation
      */
-    static applyExtractContent(block, cache, isReplay = false) {
-        this.populateBlock(block, 'remaining', () => document.createDocumentFragment(), cache, isReplay);
+    static applyExtractContent(block, cache) {
+        this.populateBlock(block, 'remaining', () => document.createDocumentFragment(), cache);
     }
     
     /**
@@ -296,7 +335,7 @@ class DOMOperations {
      */
     static normalizeBlock(block) {
         if (block.childNodes.length === 0) {
-            block.appendChild(document.createElement('br'));
+            block.appendChild(this.createElement('br'));
         }
     }
     
@@ -381,11 +420,11 @@ class DOMOperations {
                     const splitPoint = offset - currentOffset;
                     
                     if (splitPoint > 0) {
-                        beforeNodes.push(document.createTextNode(node.textContent.substring(0, splitPoint)));
+                        beforeNodes.push(this.createTextNode(node.textContent.substring(0, splitPoint)));
                     }
                     
                     if (splitPoint < nodeLength) {
-                        afterNodes.push(document.createTextNode(node.textContent.substring(splitPoint)));
+                        afterNodes.push(this.createTextNode(node.textContent.substring(splitPoint)));
                     }
                     
                     splitFound = true;
@@ -420,7 +459,7 @@ class DOMOperations {
     static _calculateExtractContent(block, startOffset, endOffset) {
         const firstSplit = this._calculateSplitContent(block, startOffset);
         
-        const tempBlock = document.createElement('div');
+        const tempBlock = this.createElement('div');
         firstSplit.afterNodes.forEach(node => tempBlock.appendChild(node));
         
         const secondSplit = this._calculateSplitContent(tempBlock, endOffset - startOffset);
@@ -455,12 +494,12 @@ class DOMOperations {
                     
                     if (splitPoint > 0) {
                         if (!beforeElement) beforeElement = element.cloneNode(false);
-                        beforeElement.appendChild(document.createTextNode(node.textContent.substring(0, splitPoint)));
+                        beforeElement.appendChild(this.createTextNode(node.textContent.substring(0, splitPoint)));
                     }
                     
                     if (splitPoint < nodeLength) {
                         if (!afterElement) afterElement = element.cloneNode(false);
-                        afterElement.appendChild(document.createTextNode(node.textContent.substring(splitPoint)));
+                        afterElement.appendChild(this.createTextNode(node.textContent.substring(splitPoint)));
                     }
                     
                     currentOffset = offset;

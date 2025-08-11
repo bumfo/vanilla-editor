@@ -39,7 +39,20 @@ class StateManager {
      */
     replay(mutation) {
         mutation._isReplay = true;
-        return this._executeMutation(mutation, false, false);
+        
+        // Set replay mode for DOM operations debugging
+        if (window.DOMOperations) {
+            DOMOperations.setReplayMode(true);
+        }
+        
+        try {
+            return this._executeMutation(mutation, false, false);
+        } finally {
+            // Always clear replay mode regardless of success/failure
+            if (window.DOMOperations) {
+                DOMOperations.setReplayMode(false);
+            }
+        }
     }
 
     /**

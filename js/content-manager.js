@@ -71,8 +71,10 @@ class ContentManager {
                 mutation.startOffset = startOffset;
                 mutation.endOffset = endOffset;
 
-                // Initialize DOM cache
-                mutation.domCache = {};
+                // Initialize DOM cache only if it doesn't exist (preserve existing cache during replay)
+                if (!mutation.domCache) {
+                    mutation.domCache = {};
+                }
                 
                 if (startBlockIndex === endBlockIndex) {
                     // Single block deletion - extract content using DOMOperations
@@ -82,7 +84,7 @@ class ContentManager {
                     mutation.mergeOffset = startOffset;
                     
                     // Apply content extraction
-                    DOMOperations.applyExtractContent(startBlock, mutation.domCache, mutation._isReplay);
+                    DOMOperations.applyExtractContent(startBlock, mutation.domCache);
                 } else {
                     // Multi-block deletion - complex merge operation
                     
@@ -132,7 +134,7 @@ class ContentManager {
                     });
                     
                     // Apply merged content to start block
-                    DOMOperations.populateBlock(startBlock, 'merged', () => document.createDocumentFragment(), mutation.domCache, mutation._isReplay);
+                    DOMOperations.populateBlock(startBlock, 'merged', () => document.createDocumentFragment(), mutation.domCache);
                     
                     // Remove end block (but keep reference for revert)
                     endBlock.remove();
@@ -193,7 +195,7 @@ class ContentManager {
                 mutation.insertedLength = content.length;
 
                 // Insert the content
-                const textNode = document.createTextNode(content);
+                const textNode = DOMOperations.createTextNode(content);
                 insertRange.insertNode(textNode);
             },
 

@@ -115,8 +115,10 @@ class BlockManager {
                 const blocks = Array.from(this.editor.children);
                 mutation.originalBlockIndex = blocks.indexOf(block);
 
-                // Initialize DOM cache
-                mutation.domCache = {};
+                // Initialize DOM cache only if it doesn't exist (preserve existing cache during replay)
+                if (!mutation.domCache) {
+                    mutation.domCache = {};
+                }
 
                 if (atEnd) {
                     // Fast path: assume split at end, newBlock content already set outside
@@ -128,10 +130,10 @@ class BlockManager {
                     mutation.splitData = splitData;
 
                     // Apply split to first block
-                    DOMOperations.applySplitToFirstBlock(block, mutation.domCache, mutation._isReplay);
+                    DOMOperations.applySplitToFirstBlock(block, mutation.domCache);
                     
                     // Populate new block with after-split content
-                    DOMOperations.populateAfterSplitBlock(newBlock, mutation.domCache, mutation._isReplay);
+                    DOMOperations.populateAfterSplitBlock(newBlock, mutation.domCache);
                 }
 
                 // Insert new block after original
@@ -204,8 +206,10 @@ class BlockManager {
                 mutation.firstBlockIndex = blocks.indexOf(firstBlock);
                 mutation.secondBlockIndex = blocks.indexOf(secondBlock);
 
-                // Initialize DOM cache
-                mutation.domCache = {};
+                // Initialize DOM cache only if it doesn't exist (preserve existing cache during replay)
+                if (!mutation.domCache) {
+                    mutation.domCache = {};
+                }
 
                 // Prepare merge operation using DOMOperations
                 const mergeData = DOMOperations.prepareMergeBlocks(firstBlock, secondBlock, mutation.domCache);
@@ -219,7 +223,7 @@ class BlockManager {
                 mutation.caretStateAfter = CaretState.collapsed(mutation.firstBlockIndex, mutation.mergeOffset);
 
                 // Apply merge using DOMOperations
-                DOMOperations.applyMergeBlocks(firstBlock, mutation.domCache, mutation._isReplay);
+                DOMOperations.applyMergeBlocks(firstBlock, mutation.domCache);
 
                 // Remove second block (but keep reference for revert)
                 secondBlock.remove();
@@ -300,7 +304,7 @@ class BlockManager {
         if (!this.isBlock(block)) return false;
 
         // Create new element outside mutation for reusability
-        const newElement = document.createElement(tagName.toUpperCase());
+        const newElement = DOMOperations.createElement(tagName.toUpperCase());
 
         return this.stateManager.commit({
             type: 'formatBlock',
@@ -335,7 +339,7 @@ class BlockManager {
         if (!this.isBlock(block)) return null;
 
         // Create new block outside mutation for reusability
-        const newBlock = document.createElement(newBlockTag || block.tagName);
+        const newBlock = DOMOperations.createElement(newBlockTag || block.tagName);
 
         const success = this.stateManager.commit({
             type: 'splitBlock',
@@ -361,11 +365,11 @@ class BlockManager {
         if (!this.isBlock(block)) return null;
 
         // Create new block outside mutation for reusability
-        const newBlock = document.createElement(newBlockTag || block.tagName);
+        const newBlock = DOMOperations.createElement(newBlockTag || block.tagName);
         if (content) {
-            newBlock.appendChild(document.createTextNode(content));
+            newBlock.appendChild(DOMOperations.createTextNode(content));
         } else {
-            newBlock.appendChild(document.createElement('br'));
+            newBlock.appendChild(DOMOperations.createElement('br'));
         }
 
         const success = this.stateManager.commit({
@@ -442,7 +446,7 @@ class BlockManager {
 
         for (const node of childNodes) {
             if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
-                const p = document.createElement(this.getDefaultBlockTag());
+                const p = DOMOperations.createElement(this.getDefaultBlockTag());
                 node.parentNode.insertBefore(p, node);
                 p.appendChild(node);
             }

@@ -30,11 +30,11 @@ class Editor {
      */
     createEditingBar() {
         // Create toolbar container
-        this.toolbar = document.createElement('div');
+        this.toolbar = DOMOperations.createElement('div');
         this.toolbar.className = 'editor-toolbar';
 
         // Format buttons group
-        const formatGroup = document.createElement('div');
+        const formatGroup = DOMOperations.createElement('div');
         formatGroup.className = 'toolbar-group';
 
         const formatButtons = [
@@ -45,7 +45,7 @@ class Editor {
         ];
 
         formatButtons.forEach(({ tag, label }) => {
-            const btn = document.createElement('button');
+            const btn = DOMOperations.createElement('button');
             btn.className = 'toolbar-btn format-btn';
             btn.textContent = label;
             btn.dataset.format = tag;
@@ -55,22 +55,22 @@ class Editor {
         });
 
         // Action buttons group
-        const actionGroup = document.createElement('div');
+        const actionGroup = DOMOperations.createElement('div');
         actionGroup.className = 'toolbar-group';
 
-        const splitBtn = document.createElement('button');
+        const splitBtn = DOMOperations.createElement('button');
         splitBtn.className = 'toolbar-btn action-btn';
         splitBtn.textContent = 'Split';
         splitBtn.addEventListener('mousedown', (e) => e.preventDefault());
         splitBtn.addEventListener('click', () => this.splitCurrentBlock());
 
-        const mergeBtn = document.createElement('button');
+        const mergeBtn = DOMOperations.createElement('button');
         mergeBtn.className = 'toolbar-btn action-btn';
         mergeBtn.textContent = 'Merge';
         mergeBtn.addEventListener('mousedown', (e) => e.preventDefault());
         mergeBtn.addEventListener('click', () => this.mergeWithPrevious());
 
-        const deleteSelectionBtn = document.createElement('button');
+        const deleteSelectionBtn = DOMOperations.createElement('button');
         deleteSelectionBtn.className = 'toolbar-btn action-btn';
         deleteSelectionBtn.textContent = 'Delete';
         deleteSelectionBtn.addEventListener('mousedown', (e) => e.preventDefault());
