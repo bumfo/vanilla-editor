@@ -12,6 +12,7 @@ A custom rich text editor built with **pure vanilla HTML, CSS, and JavaScript** 
 - Custom undo/redo history system with DOM-based state tracking
 - Advanced text selection and range management
 - Inline formatting preservation across all operations
+- **ES modules with constant-based mutation types**
 
 ## Architecture Highlights
 
@@ -54,11 +55,11 @@ Editor (Event Orchestration)
 
 **Handlers** (definition):
 - Contain `apply` and `revert` methods
-- Registered with `stateManager.registerHandler(type, handler)`
+- Registered with `stateManager.registerHandler(TYPE_CONSTANT, handler)`
 - Shared across all operations of that type
 
 **Instances** (data):
-- Contain `type` and operation-specific properties
+- Contain `type` (constant from mutation-types.js) and operation-specific properties
 - NO methods - just data
 - Created fresh for each operation
 - Passed to `commit()`, `replay()`, `revert()`
@@ -130,12 +131,42 @@ Editor (Event Orchestration)
 - **DRY principle** - consolidate common patterns
 - **Constants** for mutation types (better tooling support)
 
+## Mutation Type Constants
+
+All mutation types are defined as constants in `js/mutation-types.js` using uppercase naming:
+
+```javascript
+export const FORMAT_BLOCK = 'FORMAT_BLOCK';
+export const REMOVE_ELEMENT = 'REMOVE_ELEMENT';
+export const SPLIT_BLOCK = 'SPLIT_BLOCK';
+export const DELETE_BLOCK = 'DELETE_BLOCK';
+export const MERGE_BLOCKS = 'MERGE_BLOCKS';
+export const INSERT_ELEMENT = 'INSERT_ELEMENT';
+export const DELETE_CONTENT = 'DELETE_CONTENT';
+export const INSERT_CONTENT = 'INSERT_CONTENT';
+```
+
+**Usage patterns:**
+- **Handler registration:** `stateManager.registerHandler(FORMAT_BLOCK, handler)`
+- **Mutation creation:** `{ type: SPLIT_BLOCK, block, splitOffset, newBlock }`
+- **Type checking:** `if (mutation.type === MERGE_BLOCKS)`
+
+## ES Module Architecture
+
+The codebase uses ES modules while maintaining window global compatibility:
+
+- All scripts loaded with `type="module"`
+- Mutation types preloaded with `rel="modulepreload"`
+- Each file exports both ES modules and window globals
+- Import constants: `import { FORMAT_BLOCK } from './mutation-types.js'`
+
 ## File Structure
 
 ```
 editor/
 ├── index.html               # Main entry point
 ├── js/
+│   ├── mutation-types.js   # Mutation type constants (ES modules)
 │   ├── editor.js           # Main editor orchestration
 │   ├── state-manager.js    # Central mutation handling
 │   ├── block-manager.js    # Block-level operations
@@ -169,6 +200,7 @@ editor/
 ❌ **Create elements in handlers** - create outside
 ❌ **Use textContent with formatting** - destroys inline elements
 ❌ **Reinitialize domCache** - destroys existing cache
+❌ **Use string literals for mutation types** - use constants instead
 
 ### Best Practices
 
@@ -177,6 +209,8 @@ editor/
 ✅ **Position caret in apply only**
 ✅ **Store actual node arrays** for caching
 ✅ **Test invertibility** including pointer identity
-✅ **Use constants** for mutation types
+✅ **Use constants** for mutation types from mutation-types.js
 ✅ **Initialize cache conditionally**
 ✅ **Create elements once** outside handlers
+✅ **Import mutation constants** at top of files
+✅ **Export both ES modules and window globals** for compatibility
