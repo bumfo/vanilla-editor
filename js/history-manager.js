@@ -1,4 +1,4 @@
-import { SPLIT_BLOCK, MERGE_BLOCKS } from './mutation-types.js';
+import { SPLIT_BLOCK, MERGE_BLOCKS, COMPOSITE_MUTATION } from './mutation-types.js';
 import { CaretState } from './caret-tracker.js';
 import Carets from './carets.js';
 
@@ -20,8 +20,9 @@ class HistoryManager {
         this.stateManager.addBeforeCommitListener(this.onBeforeCommit.bind(this));
         this.stateManager.addCommitListener(this.onMutationCommit.bind(this));
 
+        // IME composition state
         this.isComposing = false;
-        this.composingHistory = [];
+        this.delayedMutations = [];
     }
 
     /**
@@ -138,6 +139,12 @@ class HistoryManager {
      * Push a mutation to the history stack
      */
     pushMutation(mutation) {
+        // During composition, collect mutations instead of adding to history
+        if (this.isComposing) {
+            this.delayedMutations.push(mutation);
+            return;
+        }
+
         // Get current index from DOM (0 if empty)
         const currentIndex = this.currentIndex();
 
@@ -158,11 +165,11 @@ class HistoryManager {
      */
     updateTracker() {
         if (this.isComposing) {
-            this.composingHistory.push(this.historyStack.length)
+            // During composition, skip tracker updates
             return;
         }
 
-        this.setTracker(this.historyStack.length)
+        this.setTracker(this.historyStack.length);
     }
 
     setTracker(value) {
@@ -196,21 +203,53 @@ class HistoryManager {
         }
     }
 
-    onComposingEnd() {
-        this.isComposing = false;
-        let history = this.composingHistory;
-        this.composingHistory = [];
+    /**
+     * Start IME composition - delay history updates
+     */
+    startComposition() {
+        this.isComposing = true;
+        this.delayedMutations = [];
+    }
 
-        let range = Carets.getCurrentRange();
-        const endPos = this.caretTracker.getLogicalPosition(range.startContainer, range.startOffset);
-
-        for (let x of history) {
-            let mutation = this.historyStack[x - 1]
-            mutation.caretStateAfter = CaretState.collapsed(endPos.blockIndex, endPos.offset);
-            console.log('hack caretStateAfter', mutation.caretStateAfter, mutation);
-
-            this.setTracker(x);
+    /**
+     * End IME composition - create composite mutation with final caret position
+     */
+    endComposition() {
+        if (!this.isComposing || this.delayedMutations.length === 0) {
+            this.isComposing = false;
+            this.delayedMutations = [];
+            return;
         }
+
+        // Capture final caret position after all IME operations
+        let finalCaretState = null;
+        try {
+            const range = Carets.getCurrentRange();
+            if (range) {
+                const endPos = this.caretTracker.getLogicalPosition(range.startContainer, range.startOffset);
+                finalCaretState = CaretState.collapsed(endPos.blockIndex, endPos.offset);
+            }
+        } catch (error) {
+            console.warn('Failed to capture final caret state:', error);
+        }
+
+        // Create composite mutation containing all delayed mutations
+        const compositeMutation = {
+            type: COMPOSITE_MUTATION,
+            mutations: [...this.delayedMutations],
+            caretStateAfter: finalCaretState,
+            caretStateBefore: this.delayedMutations[0]?.caretStateBefore || null
+        };
+
+        // Add composite mutation to history as single entry
+        this.historyStack.push(compositeMutation);
+
+        // Clear composition state
+        this.isComposing = false;
+        this.delayedMutations = [];
+
+        // Update tracker once for the composite mutation
+        this.setTracker(this.historyStack.length);
     }
 
     /**

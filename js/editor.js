@@ -285,8 +285,6 @@ class Editor {
             btn.addEventListener('click', this.onButtonClick.bind(this));
         }
 
-        // Initialize IME composition state
-        this.historyManager.isComposing = false;
     }
 
     /**
@@ -331,10 +329,6 @@ class Editor {
 
         // For cross-block selections, delete first before inserting
         if (!window.getSelection().isCollapsed && this.isCrossBlockSelection()) {
-            console.log('onKeyPress', 'deleteSelection');
-
-            // e.preventDefault();
-            // this.contentManager.deleteSelection();
             this.contentManager.deleteSelection();
         }
 
@@ -364,7 +358,6 @@ class Editor {
                     let tag = /^H[1-6]$/.test(block.tagName) ? 'P' : block.tagName;
                     this.blockManager.insertBlockAfter(block, '', tag);
                 } else {
-                    console.log('split block:', block);
                     // Regular split at cursor position
                     this.blockManager.splitBlock(block, textOffset);
                 }
@@ -488,27 +481,13 @@ class Editor {
      * Handle IME composition start
      */
     onCompositionStart(e) {
-        console.log('onCompositionStart', e.inputType);
+        // Start composition mode in history manager
+        this.historyManager.startComposition();
 
-        this.historyManager.isComposing = true;
-
-        if (e.inputType === undefined) {
-            this.contentManager.deleteSelection();
-            // this.updateToolbarState();
-
-            return;
-        }
-
-        // For cross-block selections during IME, handle deletion
-        if (!window.getSelection().isCollapsed && this.isCrossBlockSelection() && e.inputType !== undefined) {
-            // Let the composition complete first, then handle the selection
-            // setTimeout(() => {
-            // if (!window.getSelection().isCollapsed && this.isCrossBlockSelection()) {
-            console.log('onCompositionStart', 'deleteSelection');
+        // Handle cross-block selections during IME
+        if (!window.getSelection().isCollapsed && this.isCrossBlockSelection()) {
             this.contentManager.deleteSelection();
             this.updateToolbarState();
-            // }
-            // }, 0);
         }
     }
 
@@ -516,15 +495,15 @@ class Editor {
      * Handle IME composition update
      */
     onCompositionUpdate(e) {
-        // IME is still composing, maintain flag
-        this.historyManager.isComposing = true;
+        // IME composition is ongoing - history manager handles the delay
     }
 
     /**
      * Handle IME composition end
      */
     onCompositionEnd(e) {
-        this.historyManager.onComposingEnd();
+        // End composition mode and create composite mutation
+        this.historyManager.endComposition();
     }
 
     /**

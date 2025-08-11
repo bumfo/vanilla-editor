@@ -1,4 +1,5 @@
 import DOMOperations from './dom-operations.js';
+import { COMPOSITE_MUTATION } from './mutation-types.js';
 
 /**
  * State Manager - Central hub for all DOM manipulations
@@ -10,6 +11,9 @@ class StateManager {
         this.handlers = new Map();
         this.commitListeners = [];
         this.beforeCommitListeners = [];
+        
+        // Register built-in composite mutation handler
+        this.registerCompositeHandler();
     }
 
     /**
@@ -146,6 +150,48 @@ class StateManager {
         if (index > -1) {
             this.beforeCommitListeners.splice(index, 1);
         }
+    }
+
+    /**
+     * Register the built-in composite mutation handler
+     */
+    registerCompositeHandler() {
+        this.registerHandler(COMPOSITE_MUTATION, {
+            apply: (compositeMutation) => {
+                // Apply each sub-mutation in sequence
+                for (const subMutation of compositeMutation.mutations) {
+                    const success = this.applySilently(subMutation);
+                    if (!success) {
+                        console.error('Failed to apply sub-mutation in composite:', subMutation);
+                        break;
+                    }
+                }
+                
+                // Composite mutations handle their own caret positioning
+                // The caretStateAfter will be handled by the history manager
+            },
+            
+            revert: (compositeMutation) => {
+                // Revert sub-mutations in reverse order
+                const mutations = [...compositeMutation.mutations].reverse();
+                for (const subMutation of mutations) {
+                    const success = this.revert(subMutation);
+                    if (!success) {
+                        console.error('Failed to revert sub-mutation in composite:', subMutation);
+                        break;
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * Apply a mutation silently (used by composite handler - no history recording)
+     * @param {Object} mutation - The mutation to apply
+     * @returns {boolean} - Whether the mutation was applied successfully
+     */
+    applySilently(mutation) {
+        return this._executeMutation(mutation, false, false);
     }
 }
 
