@@ -6,6 +6,7 @@ import HistoryManager from './history-manager.js';
 import ContentManager from './content-manager.js';
 import DOMOperations from './dom-operations.js';
 import Carets from './carets.js';
+import BlockText from './block-text.js';
 
 /**
  * Main Editor Application

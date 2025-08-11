@@ -1,3 +1,5 @@
+import DOMOperations from './dom-operations.js';
+
 /**
  * State Manager - Central hub for all DOM manipulations
  * All editing operations go through this manager to ensure consistency

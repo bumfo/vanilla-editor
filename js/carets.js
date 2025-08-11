@@ -1,3 +1,5 @@
+import { CaretState } from './caret-tracker.js';
+
 /**
  * Selection utilities - Static methods for selection and range management
  */
