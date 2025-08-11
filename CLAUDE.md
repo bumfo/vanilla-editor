@@ -4,266 +4,105 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a custom rich text editor built with vanilla HTML, CSS, and JavaScript. The editor features:
+A custom rich text editor built with **pure vanilla HTML, CSS, and JavaScript** - no build system, no dependencies.
 
+Key features:
 - Contenteditable-based editing with custom keyboard handling
 - Block-level element manipulation (headings, paragraphs)
 - Custom undo/redo history system with DOM-based state tracking
 - Advanced text selection and range management
-- Block text utilities for layout-free text processing
-- Clean separation of concerns with specialized managers
+- Inline formatting preservation across all operations
 
-## Architecture
+## Architecture Overview
 
 ### Core Design Principles
 
-- **Separation of Concerns**: Each manager handles its own domain and registers its own handlers
-- **DOM-based State**: History index stored in DOM to prevent state drift
-- **Mutation-based Updates**: All state changes are expressed as mutations
-- **Clean Event Flow**: User actions (commits) are recorded, history operations (replay/revert) are not
+1. **Mutation-based State Management**: All changes expressed as reversible mutations
+2. **DOM-based Truth**: History index stored in DOM to prevent state drift
+3. **Perfect Node Identity**: Same DOM nodes reused across undo/redo cycles
+4. **Clean Separation**: Each manager self-registers handlers and owns its domain
 
-### Component Structure
+### Key Components
 
-#### State Management System
-
-- **StateManager**: Central mutation handler with clean interface
-  - `commit(mutation)`: Apply user-initiated mutation (recorded in history)
-  - `replay(mutation)`: Replay history mutation (not recorded)
-  - `revert(mutation)`: Revert mutation for undo (not recorded)
-  - Single internal `_executeMutation()` method avoids duplication
-  - Commit listeners only notified for user actions
-
-#### Specialized Managers
-
-- **Editor**: High-level orchestration and user interaction
-  - Event handling (keyboard, mouse, paste prevention)
-  - Coordination between managers
-  - No direct DOM manipulation or handler registration
-
-- **BlockManager**: Block-level operations
-  - Self-registers handlers: `formatBlock`, `insertElement`, `removeElement`
-  - High-level methods: `formatBlock()`, `insertBlock()`, `removeBlock()`
-  - Inline apply/revert functions for clean implementation
-
-- **ContentManager**: Text and range operations
-  - Self-registers handlers: `textContent`, `deleteContent`, `insertContent`
-  - High-level methods: `deleteSelection()`, `insertAtCursor()`
-  - Uses CaretState ranges for multi-block selections
-
-- **SelectionManager**: Selection and cursor management
-  - `saveSelection()` / `restoreSelection()`: Preserves cursor across operations
-  - Works with Range and Selection APIs
-
-- **HistoryManager**: Undo/redo functionality
-  - Uses hidden contenteditable div to hook into browser's native undo/redo
-  - DOM-based index tracking (no separate currentIndex variable)
-  - Listens only to commit events (no circular dependencies)
-  - Direct `revert()` for undo, `replay()` for redo
-
-#### Basic Utility Classes
-
-- **CaretState**: Logical caret position representation
-  - Properties: `startBlockIndex`, `startOffset`, `endBlockIndex`, `endOffset`, `isCollapsed`
-  - Static constructors: `CaretState.collapsed(blockIndex, offset)` for single position
-  - Static constructors: `CaretState.range(startBlockIndex, startOffset, endBlockIndex, endOffset)` for selections
-  - Methods: `isValid(editor)`, `createFallback(editor)`, `clone()`, `toString()`
-  - Immune to DOM changes, uses block indices instead of DOM references
-
-- **CaretTracker**: Converts between DOM Ranges and CaretState
-  - `captureCaretState()`: Get current caret position as CaretState
-  - `restoreCaretState(caretState)`: Apply CaretState to DOM selection
-  - `createRangeFromCaretState(caretState)`: Convert logical position to DOM Range
-  - `getLogicalPosition(node, offset)`: Convert DOM position to block index + text offset
-  - Handles complex DOM traversal and text offset calculations
-
+- **StateManager**: Central mutation orchestrator (`commit`, `replay`, `revert`)
+- **Editor**: High-level event handling and coordination
+- **BlockManager**: Block-level operations (format, insert, remove)
+- **ContentManager**: Text and range operations with inline preservation
+- **HistoryManager**: Undo/redo via hidden contenteditable hook
+- **CaretTracker/Carets**: Caret position and selection management
 - **DOMOperations**: Low-level DOM manipulation preserving inline formatting
-  - **Perfect Node Identity Caching**: Stores actual DOM nodes for reuse across undo/redo cycles
-  - **3-Phase Pattern**: prepare → apply → revert operations for mutation system integration
-  - **Split Operations**: `prepareSplitBlock()`, `applySplitToFirstBlock()`, `revertSplitBlock()`
-  - **Merge Operations**: `prepareMergeBlocks()`, `applyMergeBlocks()`, `revertMergeBlocks()`
-  - **Extract Operations**: `prepareExtractContent()`, `applyExtractContent()`, `revertExtractContent()`
-  - **DRY Utilities**: `clearBlock()`, `populateBlock()`, `normalizeBlock()`, `getTextLength()`
-  - Eliminates `textContent` usage that destroys inline formatting and text nodes
 
-### Mutation Flow
+### Critical Implementation Rules
 
-1. **User Action** → `stateManager.commit(mutation)` → Records in history
-2. **Undo** → `stateManager.revert(mutation)` → No recording
-3. **Redo** → `stateManager.replay(mutation)` → No recording
-
-### Key Implementation Details
-
-#### History System
-
-- **DOM-based Index**: History index stored in hidden div's innerText
-  - Empty div = index 0
-  - Prevents drift between internal state and browser undo/redo
-- **Clean Event Separation**: Only commits trigger history recording
-- **No Flags Needed**: Clean architectural separation eliminates circular dependencies
-
-#### BlockText Module
-
-Advanced text utilities that work without forcing layout calculations:
-- `isAtBlockStart()` / `isAtBlockEnd()`: Detect cursor position at block boundaries
-- `getVisibleOffsetFromBlockStart()`: Calculate text offset with whitespace collapsing
-- Handles CSS `white-space` properties, hidden elements, and atomic inlines
-- Supports both CSS-aware and fallback block detection
-
-### Event Handling
-
-- **Keyboard events**: Custom handling for Enter, Tab, Backspace, Delete keys
-- **Input events**: Processes `historyUndo` and `historyRedo` input types
-- **Mouse events**: Dynamic contenteditable attribute management
-- **Paste prevention**: All paste operations are blocked
+1. **Caret positioning** belongs in mutation `apply` handlers ONLY
+2. **DOM state capture** BEFORE making changes, never rely on stale references
+3. **Element creation** outside mutations when possible, reuse in revert
+4. **No cloning** in cache operations - preserve node identity
 
 ## Code Style Guidelines
 
-- **No redundant variables**: Use direct object literals for mutations
-- **Inline handlers**: Define apply/revert inline unless complex
-- **DRY principle**: Avoid duplication, consolidate common patterns
-- **Self-registration**: Managers register their own handlers in constructor
+- **Direct object literals** for mutations (no redundant variables)
+- **Inline handlers** unless complex
+- **Self-registration** - managers register their own handlers
+- **DRY principle** - consolidate common patterns
 
 ## File Structure
 
 ```
 editor/
-├── index.html                 # Main entry point
-├── history.html              # Original prototype implementation
+├── index.html               # Main entry point
 ├── js/
-│   ├── editor.js            # Main editor orchestration
-│   ├── state-manager.js     # Central mutation handling
-│   ├── block-manager.js     # Block-level operations
-│   ├── content-manager.js   # Text/range operations
-│   ├── selection-manager.js # Selection/cursor management
-│   ├── history-manager.js   # Undo/redo functionality
-│   ├── caret-tracker.js     # CaretState and CaretTracker classes
-│   ├── carets.js           # Caret utility functions
-│   ├── dom-operations.js   # DOMOperations class for inline-preserving mutations
-│   └── block-text.js        # Text position utilities
+│   ├── editor.js           # Main editor orchestration
+│   ├── state-manager.js    # Central mutation handling
+│   ├── block-manager.js    # Block-level operations
+│   ├── content-manager.js  # Text/range operations
+│   ├── history-manager.js  # Undo/redo functionality
+│   ├── caret-tracker.js    # CaretState and CaretTracker classes
+│   ├── carets.js          # Caret/selection utilities
+│   ├── dom-operations.js  # DOM manipulation utilities
+│   └── block-text.js       # Text position utilities
 └── css/
-    └── editor.css           # Editor styles
+    └── editor.css          # Editor styles
 ```
 
-## Development Notes
+## Detailed Implementation Guides
 
-- No build system or package.json - pure vanilla implementation
-- No external dependencies or frameworks
-- Uses modern browser APIs (Range, Selection, TreeWalker, etc.)
-- Each manager is self-contained with both interface and implementation
+- **[CARET-HANDLING.md](./CARET-HANDLING.md)** - Caret positioning patterns and implementation
+- **[HISTORY-COMPATIBLE-CODE.md](./HISTORY-COMPATIBLE-CODE.md)** - DOM state capture and revert patterns
 
-## Caret Handling
+## Quick Reference
 
-**Key Rule**: Caret positioning belongs in mutation `apply` handlers ONLY - never in `revert` handlers (history system handles that) or high-level methods (Editor class).
-
-### Core Patterns:
-- **Creating blocks** → Position caret at start of new block
-- **Merging content** → Position caret at merge point  
-- **Preserving position** → Capture before, restore after (e.g., formatBlock)
-- **Deleting blocks** → Move caret to end of previous block
-
-### DRY Helpers:
-- `this.captureCaretState(mutation)` - Captures current position
-- `this.restoreCaretState(mutation, 'caretStateAfter')` - Restores to calculated position
-
-See [CARET-HANDLING.md](./CARET-HANDLING.md) for detailed guidelines and implementation patterns.
-
-## History-Compatible Code
-
-**Critical Rule**: Always capture DOM state BEFORE making changes, never rely on stale references.
-
-- **Element replacement**: Capture `parentNode` and `nextSibling` before DOM changes
-- **Revert operations**: Use `remove()` + `insertBefore()` instead of `replaceChild()` with stale refs
-- **Content changes**: Store original state first, then apply changes
-
-Example:
+### Mutation Pattern
 ```javascript
-// GOOD: Capture parent info before changes
-mutation.parent = element.parentNode;
-mutation.nextSibling = element.nextSibling;
-
-// GOOD: Revert with captured info
-newElement.remove();
-parent.insertBefore(oldElement, nextSibling);
-
-// BAD: Stale reference - parentNode might be null
-newElement.parentNode.replaceChild(oldElement, newElement);
+// Create element outside, pass to mutation
+const newElement = document.createElement(tagName);
+stateManager.commit({
+    type: 'formatBlock',
+    element: block,
+    newElement: newElement,
+    apply: (mutation) => {
+        // Capture DOM state first
+        mutation.parent = element.parentNode;
+        mutation.nextSibling = element.nextSibling;
+        // Apply changes
+        element.replaceWith(newElement);
+    },
+    revert: (mutation) => {
+        // Reuse stored elements
+        newElement.remove();
+        mutation.parent.insertBefore(element, mutation.nextSibling);
+    }
+});
 ```
 
-See [HISTORY-COMPATIBLE-CODE.md](./HISTORY-COMPATIBLE-CODE.md) for detailed patterns and examples.
+### Anti-Patterns to Avoid
 
-## Element Creation Patterns
+❌ **Never clone cached nodes** - breaks identity  
+❌ **Never use stale DOM references** - capture before changes  
+❌ **Never position caret in revert** - history handles it  
+❌ **Never use DocumentFragments for caching** - becomes empty  
 
-**Best Practice**: Create DOM elements outside mutations when possible, pass them in as parameters.
-
-**Critical Rule**: Avoid creating elements repeatedly in apply/revert - reuse the same DOM elements to maintain identical tree structure during undo/redo operations.
-
-- **Benefits**: Element reuse in revert operations, cleaner mutation logic, better performance
-- **Pattern**: `createElement()` in high-level method, pass element to mutation
-- **Revert**: Reuse existing DOM elements instead of creating new ones
-- **Identity**: Same DOM elements across apply/revert cycles prevents bugs and simplifies implementation
-
-```javascript
-// GOOD: Create element outside, pass to mutation
-formatBlock(block, tagName) {
-    const newElement = document.createElement(tagName);
-    return this.stateManager.commit({
-        element: block,
-        newElement: newElement,
-    });
-}
-
-// GOOD: Store and reuse DOM elements in mutations
-apply: (mutation) => {
-    // Store element for revert
-    mutation.removedElement = element;
-    element.remove();
-},
-revert: (mutation) => {
-    // Reuse same DOM element
-    parent.insertBefore(mutation.removedElement, nextSibling);
-}
-```
-
-## DOM Node Caching Anti-Patterns
-
-**Critical Rule**: Perfect node identity preservation requires avoiding cloning and DocumentFragment complexity.
-
-### Anti-Pattern 1: Node Cloning
-```javascript
-// BAD: Cloning breaks node identity - creates new objects
-return cache._nodes.get(cacheKey).cloneNode(true);
-
-// GOOD: Return the actual cached node for reuse
-return cache._nodes.get(cacheKey);
-```
-
-### Anti-Pattern 2: DocumentFragment Indirection
-```javascript
-// BAD: Fragments become empty, requiring complex extraction logic
-const createContentFn = () => {
-    const fragment = document.createDocumentFragment();
-    nodes.forEach(node => fragment.appendChild(node));
-    return fragment; // Fragment will be empty after extraction
-};
-
-// GOOD: Return node arrays directly
-const createContentFn = () => {
-    return nodes.map(node => node.cloneNode(true)); // Only clone at creation time
-};
-```
-
-### Why These Patterns Break Identity
-- **Cloning**: Creates new DOM objects, breaking the core principle of reusing identical nodes
-- **DocumentFragments**: Become empty when nodes are moved, forcing complex extraction and indirection
-- **Performance**: Unnecessary object creation and DOM manipulation overhead
-- **Debugging**: Makes it impossible to verify that the same node objects are being reused
-
-### Correct Pattern: Direct Node Array Storage
-```javascript
-// Store actual nodes directly in arrays
-cache._nodeArrays.set(cacheKey, actualNodeArray);
-
-// Move the same node objects between DOM locations
-const nodes = cache._nodeArrays.get(cacheKey);
-nodes.forEach(node => targetElement.appendChild(node));
-```
+✅ **Always reuse same DOM nodes** across operations  
+✅ **Always capture state before changes**  
+✅ **Always position caret in apply only**  
+✅ **Always store actual node arrays** for caching
