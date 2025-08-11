@@ -76,6 +76,15 @@ This is a custom rich text editor built with vanilla HTML, CSS, and JavaScript. 
   - `getLogicalPosition(node, offset)`: Convert DOM position to block index + text offset
   - Handles complex DOM traversal and text offset calculations
 
+- **DOMOperations**: Low-level DOM manipulation preserving inline formatting
+  - **Black Box Caching**: Internal node/fragment caching for mutation history compatibility
+  - **3-Phase Pattern**: prepare → apply → revert operations for mutation system integration
+  - **Split Operations**: `prepareSplitBlock()`, `applySplitToFirstBlock()`, `revertSplitBlock()`
+  - **Merge Operations**: `prepareMergeBlocks()`, `applyMergeBlocks()`, `revertMergeBlocks()`
+  - **Extract Operations**: `prepareExtractContent()`, `applyExtractContent()`, `revertExtractContent()`
+  - **DRY Utilities**: `clearBlock()`, `populateBlock()`, `normalizeBlock()`, `getTextLength()`
+  - Eliminates `textContent` usage that destroys inline formatting and text nodes
+
 ### Mutation Flow
 
 1. **User Action** → `stateManager.commit(mutation)` → Records in history
@@ -129,6 +138,7 @@ editor/
 │   ├── history-manager.js   # Undo/redo functionality
 │   ├── caret-tracker.js     # CaretState and CaretTracker classes
 │   ├── carets.js           # Caret utility functions
+│   ├── dom-operations.js   # DOMOperations class for inline-preserving mutations
 │   └── block-text.js        # Text position utilities
 └── css/
     └── editor.css           # Editor styles

@@ -115,24 +115,23 @@ class BlockManager {
                 const blocks = Array.from(this.editor.children);
                 mutation.originalBlockIndex = blocks.indexOf(block);
 
-                // Store references for revert (newBlock passed from outside)
-                mutation.originalTextContent = block.textContent;
+                // Initialize DOM cache
+                mutation.domCache = {};
 
                 if (atEnd) {
                     // Fast path: assume split at end, newBlock content already set outside
-                    // No content changes needed to original block
+                    // Just capture original content for revert
+                    DOMOperations.captureBlockContent(block, 'original', mutation.domCache);
                 } else {
-                    // Regular split path
-                    mutation.splitOffset = splitOffset;
+                    // Regular split path using DOMOperations
+                    const splitData = DOMOperations.prepareSplitBlock(block, splitOffset, mutation.domCache);
+                    mutation.splitData = splitData;
 
-                    // Split the text content
-                    const textContent = block.textContent;
-                    const beforeText = textContent.substring(0, splitOffset);
-                    const afterText = textContent.substring(splitOffset);
-
-                    // Update original block
-                    block.textContent = beforeText;
-                    newBlock.textContent = afterText;
+                    // Apply split to first block
+                    DOMOperations.applySplitToFirstBlock(block, mutation.domCache);
+                    
+                    // Populate new block with after-split content
+                    DOMOperations.populateAfterSplitBlock(newBlock, mutation.domCache);
                 }
 
                 // Insert new block after original
@@ -147,14 +146,17 @@ class BlockManager {
             },
 
             revert: (mutation) => {
-                const { block, newBlock, originalTextContent, atEnd } = mutation;
+                const { block, newBlock, atEnd } = mutation;
 
                 // Remove the new block
                 newBlock.remove();
 
                 if (!atEnd) {
-                    // Restore original text content only if we actually split
-                    block.textContent = originalTextContent;
+                    // Restore original content using DOMOperations
+                    DOMOperations.revertSplitBlock(block, mutation.domCache);
+                } else {
+                    // Restore original content for atEnd case
+                    DOMOperations.restoreBlockContent(block, 'original', mutation.domCache);
                 }
             },
         });
@@ -174,7 +176,8 @@ class BlockManager {
                 if (previousBlock) {
                     const blocks = Array.from(this.editor.children);
                     const prevBlockIndex = blocks.indexOf(previousBlock);
-                    mutation.caretStateAfter = CaretState.collapsed(prevBlockIndex, previousBlock.textContent.length);
+                    const prevBlockTextLength = DOMOperations.getTextLength(previousBlock);
+                    mutation.caretStateAfter = CaretState.collapsed(prevBlockIndex, prevBlockTextLength);
                 }
                 
                 block.remove();
@@ -196,13 +199,18 @@ class BlockManager {
             apply: (mutation) => {
                 const { firstBlock, secondBlock } = mutation;
 
-                // Store block indices and content for revert and caret tracking
+                // Store block indices for caret tracking
                 const blocks = Array.from(this.editor.children);
                 mutation.firstBlockIndex = blocks.indexOf(firstBlock);
                 mutation.secondBlockIndex = blocks.indexOf(secondBlock);
-                mutation.firstBlockContent = firstBlock.textContent;
-                mutation.secondBlockContent = secondBlock.textContent;
-                mutation.mergeOffset = firstBlock.textContent.length;
+
+                // Initialize DOM cache
+                mutation.domCache = {};
+
+                // Prepare merge operation using DOMOperations
+                const mergeData = DOMOperations.prepareMergeBlocks(firstBlock, secondBlock, mutation.domCache);
+                mutation.mergeData = mergeData;
+                mutation.mergeOffset = mergeData.mergeOffset;
 
                 // Store second block element for reuse in revert
                 mutation.removedSecondBlock = secondBlock;
@@ -210,8 +218,8 @@ class BlockManager {
                 // Set caret state for after merge (cursor at merge point where first block ends)
                 mutation.caretStateAfter = CaretState.collapsed(mutation.firstBlockIndex, mutation.mergeOffset);
 
-                // Merge content
-                firstBlock.textContent = firstBlock.textContent + secondBlock.textContent;
+                // Apply merge using DOMOperations
+                DOMOperations.applyMergeBlocks(firstBlock, mutation.domCache);
 
                 // Remove second block (but keep reference for revert)
                 secondBlock.remove();
@@ -221,14 +229,13 @@ class BlockManager {
             },
 
             revert: (mutation) => {
-                const { firstBlock, firstBlockContent, secondBlockContent, removedSecondBlock } = mutation;
+                const { firstBlock, removedSecondBlock } = mutation;
 
-                // Restore original content
-                firstBlock.textContent = firstBlockContent;
-
-                // Reuse the removed second block element
-                removedSecondBlock.textContent = secondBlockContent;
-                mutation.secondBlock = removedSecondBlock; // Update reference
+                // Restore both blocks using DOMOperations
+                DOMOperations.revertMergeBlocks(firstBlock, removedSecondBlock, mutation.domCache);
+                
+                // Update reference for consistency
+                mutation.secondBlock = removedSecondBlock;
 
                 // Re-insert second block
                 firstBlock.parentNode.insertBefore(removedSecondBlock, firstBlock.nextSibling);
@@ -356,7 +363,7 @@ class BlockManager {
         // Create new block outside mutation for reusability
         const newBlock = document.createElement(newBlockTag || block.tagName);
         if (content) {
-            newBlock.textContent = content;
+            newBlock.appendChild(document.createTextNode(content));
         } else {
             newBlock.appendChild(document.createElement('br'));
         }

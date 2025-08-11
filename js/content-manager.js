@@ -70,85 +70,105 @@ class ContentManager {
                 mutation.endBlockIndex = endBlockIndex;
                 mutation.startOffset = startOffset;
                 mutation.endOffset = endOffset;
+
+                // Initialize DOM cache
+                mutation.domCache = {};
                 
                 if (startBlockIndex === endBlockIndex) {
-                    // Single block deletion - simple text removal
-                    mutation.originalContent = startBlock.textContent;
+                    // Single block deletion - extract content using DOMOperations
+                    const extractData = DOMOperations.prepareExtractContent(startBlock, startOffset, endOffset, mutation.domCache);
+                    mutation.extractData = extractData;
                     mutation.deletedBlocks = [];
+                    mutation.mergeOffset = startOffset;
                     
-                    const text = startBlock.textContent;
-                    const beforeText = text.substring(0, startOffset);
-                    const afterText = text.substring(endOffset);
-                    startBlock.textContent = beforeText + afterText;
+                    // Apply content extraction
+                    DOMOperations.applyExtractContent(startBlock, mutation.domCache);
                 } else {
-                    // Multi-block deletion - merge like mergeBlocks
-                    mutation.startBlockOriginalContent = startBlock.textContent;
-                    mutation.endBlockOriginalContent = endBlock.textContent;
+                    // Multi-block deletion - complex merge operation
                     
-                    // Store intermediate blocks for revert (similar to mergeBlocks pattern)
+                    // Capture original content of start and end blocks
+                    DOMOperations.captureBlockContent(startBlock, 'originalStart', mutation.domCache);
+                    DOMOperations.captureBlockContent(endBlock, 'originalEnd', mutation.domCache);
+                    
+                    // Store intermediate blocks for revert (capture their content properly)
                     mutation.deletedBlocks = [];
                     for (let i = startBlockIndex + 1; i < endBlockIndex; i++) {
                         const block = blocks[i];
+                        const blockCacheKey = `intermediateBlock_${i}`;
+                        DOMOperations.captureBlockContent(block, blockCacheKey, mutation.domCache);
                         mutation.deletedBlocks.push({
                             element: block,
-                            content: block.textContent,
+                            cacheKey: blockCacheKey,
                             tagName: block.tagName
                         });
                     }
                     
-                    // Store endBlock for reuse in revert (like mergeBlocks)
+                    // Store endBlock for reuse in revert
                     mutation.removedEndBlock = endBlock;
-                    mutation.removedEndBlockContent = endBlock.textContent;
                     
-                    // Calculate merge offset (like mergeBlocks)
-                    const startBlockRemainingText = startBlock.textContent.substring(0, startOffset);
-                    mutation.mergeOffset = startBlockRemainingText.length;
+                    // Calculate merge offset (start block remaining length)
+                    mutation.mergeOffset = startOffset;
+                    
+                    // Create merged content: start block (0 to startOffset) + end block (endOffset to end)
+                    const createMergedFn = () => {
+                        const fragment = document.createDocumentFragment();
+                        
+                        // Get content BEFORE the selection (0 to startOffset) from start block
+                        const beforeSplit = DOMOperations.calculateSplitContent(startBlock, startOffset);
+                        beforeSplit.beforeNodes.forEach(node => fragment.appendChild(node));
+                        
+                        // Get content AFTER the selection (endOffset to end) from end block  
+                        const afterSplit = DOMOperations.calculateSplitContent(endBlock, endOffset);
+                        afterSplit.afterNodes.forEach(node => fragment.appendChild(node));
+                        
+                        return fragment;
+                    };
+                    
+                    DOMOperations.getCachedFragment('merged', createMergedFn, mutation.domCache);
                     
                     // Remove intermediate blocks
                     mutation.deletedBlocks.forEach(blockInfo => {
                         blockInfo.element.remove();
                     });
                     
-                    // Merge start and end blocks (like mergeBlocks)
-                    const endBlockRemainingText = endBlock.textContent.substring(endOffset);
-                    startBlock.textContent = startBlockRemainingText + endBlockRemainingText;
+                    // Apply merged content to start block
+                    DOMOperations.populateBlock(startBlock, 'merged', () => document.createDocumentFragment(), mutation.domCache);
                     
                     // Remove end block (but keep reference for revert)
                     endBlock.remove();
                 }
 
-                // Set caret position at merge/deletion point (like mergeBlocks)
-                mutation.caretStateAfter = CaretState.collapsed(startBlockIndex, mutation.mergeOffset || startOffset);
+                // Set caret position at merge/deletion point
+                mutation.caretStateAfter = CaretState.collapsed(startBlockIndex, mutation.mergeOffset);
                 
-                // Restore caret immediately using DRY helper (like mergeBlocks)
+                // Restore caret immediately using DRY helper
                 this.restoreCaretState(mutation, 'caretStateAfter');
             },
 
             revert: (mutation) => {
                 const { 
                     startBlockIndex, endBlockIndex, 
-                    startBlockOriginalContent, endBlockOriginalContent,
-                    originalContent, deletedBlocks, removedEndBlock
+                    deletedBlocks, removedEndBlock
                 } = mutation;
                 
                 const blocks = Array.from(this.editor.children);
                 const startBlock = blocks[startBlockIndex];
                 
                 if (startBlockIndex === endBlockIndex) {
-                    // Single block revert
-                    startBlock.textContent = originalContent;
+                    // Single block revert using DOMOperations
+                    DOMOperations.revertExtractContent(startBlock, mutation.domCache);
                 } else {
-                    // Multi-block revert (like mergeBlocks revert)
+                    // Multi-block revert
                     // Restore original start block content
-                    startBlock.textContent = startBlockOriginalContent;
+                    DOMOperations.restoreBlockContent(startBlock, 'originalStart', mutation.domCache);
                     
-                    // Reuse the removed end block element (like mergeBlocks)
-                    removedEndBlock.textContent = endBlockOriginalContent;
+                    // Restore original end block content
+                    DOMOperations.restoreBlockContent(removedEndBlock, 'originalEnd', mutation.domCache);
                     
                     // Re-insert intermediate blocks first
                     let insertAfter = startBlock;
                     deletedBlocks.forEach(blockInfo => {
-                        blockInfo.element.textContent = blockInfo.content;
+                        DOMOperations.restoreBlockContent(blockInfo.element, blockInfo.cacheKey, mutation.domCache);
                         insertAfter.parentNode.insertBefore(blockInfo.element, insertAfter.nextSibling);
                         insertAfter = blockInfo.element;
                     });
