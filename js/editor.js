@@ -13,7 +13,7 @@ class Editor {
         this.stateManager = new StateManager();
         this.blockManager = new BlockManager(editorElement, this.stateManager, this.caretTracker);
         this.historyManager = new HistoryManager(this.stateManager, this.caretTracker);
-        this.contentManager = new ContentManager(this.stateManager, this.caretTracker);
+        this.contentManager = new ContentManager(editorElement, this.stateManager, this.caretTracker);
 
         // Create bottom editing bar
         this.createEditingBar();
@@ -70,8 +70,15 @@ class Editor {
         mergeBtn.addEventListener('mousedown', (e) => e.preventDefault());
         mergeBtn.addEventListener('click', () => this.mergeWithPrevious());
 
+        const deleteSelectionBtn = document.createElement('button');
+        deleteSelectionBtn.className = 'toolbar-btn action-btn';
+        deleteSelectionBtn.textContent = 'Delete Selection';
+        deleteSelectionBtn.addEventListener('mousedown', (e) => e.preventDefault());
+        deleteSelectionBtn.addEventListener('click', () => this.deleteSelection());
+
         actionGroup.appendChild(splitBtn);
         actionGroup.appendChild(mergeBtn);
+        actionGroup.appendChild(deleteSelectionBtn);
 
         // Add groups to toolbar
         this.toolbar.appendChild(formatGroup);
@@ -84,6 +91,7 @@ class Editor {
         this.formatButtons = formatGroup.querySelectorAll('.format-btn');
         this.splitButton = splitBtn;
         this.mergeButton = mergeBtn;
+        this.deleteSelectionButton = deleteSelectionBtn;
 
         // Update toolbar state initially and on selection change
         setTimeout(() => this.updateToolbarState(), 0);
@@ -142,6 +150,20 @@ class Editor {
     }
 
     /**
+     * Delete current selection (especially useful for cross-block selections)
+     */
+    deleteSelection() {
+        const selection = window.getSelection();
+        if (selection.rangeCount === 0 || selection.isCollapsed) return;
+
+        const success = this.contentManager.deleteSelection();
+        
+        if (success) {
+            this.updateToolbarState();
+        }
+    }
+
+    /**
      * Get normalized range and block for user actions
      * @returns {Object} Object with {range, block} properties (may be undefined)
      */
@@ -164,6 +186,24 @@ class Editor {
         }
 
         return { range, block };
+    }
+
+    /**
+     * Check if current selection spans across multiple blocks
+     * @returns {boolean} True if selection spans multiple blocks
+     */
+    isCrossBlockSelection() {
+        const selection = window.getSelection();
+        if (selection.rangeCount === 0 || selection.isCollapsed) return false;
+
+        const range = selection.getRangeAt(0);
+        
+        // Get the blocks containing start and end of selection
+        const startBlock = this.blockManager.getBlockForNode(range.startContainer);
+        const endBlock = this.blockManager.getBlockForNode(range.endContainer);
+        
+        // Cross-block if different blocks or if no blocks found (shouldn't happen)
+        return startBlock !== endBlock;
     }
 
     /**
@@ -195,6 +235,9 @@ class Editor {
 
         // Split is always enabled for now
         this.splitButton.disabled = false;
+
+        // Delete selection only enabled for cross-block selections
+        this.deleteSelectionButton.disabled = !this.isCrossBlockSelection();
     }
 
     /**
@@ -297,8 +340,13 @@ class Editor {
             return;
         }
 
-        // If there's a selection, let default behavior handle it
+        // If there's a selection, use our deleteSelection for cross-block or let default behavior handle single-block
         if (!range.collapsed) {
+            if (this.isCrossBlockSelection()) {
+                e.preventDefault();
+                this.contentManager.deleteSelection();
+                this.updateToolbarState();
+            }
             return;
         }
 
@@ -339,8 +387,13 @@ class Editor {
             return;
         }
 
-        // If there's a selection, let default behavior handle it
+        // If there's a selection, use our deleteSelection for cross-block or let default behavior handle single-block
         if (!range.collapsed) {
+            if (this.isCrossBlockSelection()) {
+                e.preventDefault();
+                this.contentManager.deleteSelection();
+                this.updateToolbarState();
+            }
             return;
         }
 
@@ -369,9 +422,11 @@ class Editor {
      */
     onBeforeInput(e) {
         const selection = window.getSelection();
-        if (!selection.isCollapsed) {
-            // Delete selected content before inserting new content
+        if (!selection.isCollapsed && this.isCrossBlockSelection()) {
+            // Only use custom deletion for cross-block selections
+            // Let browser handle single-block selections
             this.contentManager.deleteSelection();
+            this.updateToolbarState();
         }
     }
 

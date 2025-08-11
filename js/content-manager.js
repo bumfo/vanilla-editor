@@ -2,7 +2,8 @@
  * Content Manager - Handles text content and range operations
  */
 class ContentManager {
-    constructor(stateManager, caretTracker) {
+    constructor(editorElement, stateManager, caretTracker) {
+        this.editor = editorElement;
         this.stateManager = stateManager;
         this.caretTracker = caretTracker;
         this.registerHandlers();
