@@ -19,6 +19,9 @@ class HistoryManager {
         // Listen to commits for history recording and caret capture
         this.stateManager.addBeforeCommitListener(this.onBeforeCommit.bind(this));
         this.stateManager.addCommitListener(this.onMutationCommit.bind(this));
+
+        this.isComposing = false;
+        this.composingHistory = [];
     }
 
     /**
@@ -154,6 +157,15 @@ class HistoryManager {
      * MUST use execCommand for browser to track history properly
      */
     updateTracker() {
+        if (this.isComposing) {
+            this.composingHistory.push(this.historyStack.length)
+            return;
+        }
+
+        this.setTracker(this.historyStack.length)
+    }
+
+    setTracker(value) {
         // Save current selection to avoid interference with editor
         const selection = window.getSelection();
         let savedRange = null;
@@ -171,7 +183,7 @@ class HistoryManager {
         selection.addRange(range);
 
         // Use execCommand to make it undoable
-        document.execCommand('insertText', false, String(this.historyStack.length));
+        document.execCommand('insertText', false, value + '');
 
         // Restore original selection
         selection.removeAllRanges();
@@ -181,6 +193,23 @@ class HistoryManager {
             } catch (e) {
                 // Range may be invalid after DOM changes, ignore
             }
+        }
+    }
+
+    onComposingEnd() {
+        this.isComposing = false;
+        let history = this.composingHistory;
+        this.composingHistory = [];
+
+        let range = Carets.getCurrentRange();
+        const endPos = this.caretTracker.getLogicalPosition(range.startContainer, range.startOffset);
+
+        for (let x of history) {
+            let mutation = this.historyStack[x - 1]
+            mutation.caretStateAfter = CaretState.collapsed(endPos.blockIndex, endPos.offset);
+            console.log('hack caretStateAfter', mutation.caretStateAfter, mutation);
+
+            this.setTracker(x);
         }
     }
 

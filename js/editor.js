@@ -256,8 +256,14 @@ class Editor {
     setupEventListeners() {
         // Keyboard events
         this.element.addEventListener('keydown', this.onKeyDown.bind(this));
+        this.element.addEventListener('keypress', this.onKeyPress.bind(this));
         this.element.addEventListener('beforeinput', this.onBeforeInput.bind(this));
         this.element.addEventListener('paste', this.onPaste.bind(this));
+
+        // IME composition events
+        this.element.addEventListener('compositionstart', this.onCompositionStart.bind(this));
+        this.element.addEventListener('compositionupdate', this.onCompositionUpdate.bind(this));
+        this.element.addEventListener('compositionend', this.onCompositionEnd.bind(this));
 
         // Mouse events
         this.element.addEventListener('mousedown', this.onMouseDown.bind(this));
@@ -278,6 +284,9 @@ class Editor {
             btn.addEventListener('focus', e => e.preventDefault());
             btn.addEventListener('click', this.onButtonClick.bind(this));
         }
+
+        // Initialize IME composition state
+        this.historyManager.isComposing = false;
     }
 
     /**
@@ -298,6 +307,39 @@ class Editor {
                 this.handleDelete(e);
                 break;
         }
+    }
+
+    /**
+     * Handle keypress events for ordinary character input
+     */
+    onKeyPress(e) {
+        // Skip if IME composition is in progress
+        if (e.isComposing) {
+            return;
+        }
+
+        // Skip if it's a special key (Ctrl, Alt, etc.)
+        if (e.ctrlKey || e.altKey || e.metaKey) {
+            return;
+        }
+
+        // Skip non-printable characters
+        const char = e.char || String.fromCharCode(e.charCode);
+        if (!char || char.length === 0) {
+            return;
+        }
+
+        // For cross-block selections, delete first before inserting
+        if (!window.getSelection().isCollapsed && this.isCrossBlockSelection()) {
+            console.log('onKeyPress', 'deleteSelection');
+
+            // e.preventDefault();
+            // this.contentManager.deleteSelection();
+            this.contentManager.deleteSelection();
+        }
+
+        // Allow default behavior for single character insertion
+        // The browser's contenteditable will handle it naturally
     }
 
     /**
@@ -431,6 +473,8 @@ class Editor {
      * Handle beforeinput events
      */
     onBeforeInput(e) {
+        if (e.isComposing) return;
+
         const selection = window.getSelection();
         if (!selection.isCollapsed && this.isCrossBlockSelection()) {
             // Only use custom deletion for cross-block selections
@@ -438,6 +482,49 @@ class Editor {
             this.contentManager.deleteSelection();
             this.updateToolbarState();
         }
+    }
+
+    /**
+     * Handle IME composition start
+     */
+    onCompositionStart(e) {
+        console.log('onCompositionStart', e.inputType);
+
+        this.historyManager.isComposing = true;
+
+        if (e.inputType === undefined) {
+            this.contentManager.deleteSelection();
+            // this.updateToolbarState();
+
+            return;
+        }
+
+        // For cross-block selections during IME, handle deletion
+        if (!window.getSelection().isCollapsed && this.isCrossBlockSelection() && e.inputType !== undefined) {
+            // Let the composition complete first, then handle the selection
+            // setTimeout(() => {
+            // if (!window.getSelection().isCollapsed && this.isCrossBlockSelection()) {
+            console.log('onCompositionStart', 'deleteSelection');
+            this.contentManager.deleteSelection();
+            this.updateToolbarState();
+            // }
+            // }, 0);
+        }
+    }
+
+    /**
+     * Handle IME composition update
+     */
+    onCompositionUpdate(e) {
+        // IME is still composing, maintain flag
+        this.historyManager.isComposing = true;
+    }
+
+    /**
+     * Handle IME composition end
+     */
+    onCompositionEnd(e) {
+        this.historyManager.onComposingEnd();
     }
 
     /**

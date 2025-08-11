@@ -148,6 +148,11 @@ class ContentManager {
                 // Set caret position at merge/deletion point
                 mutation.caretStateAfter = CaretState.collapsed(startBlockIndex, mutation.mergeOffset);
                 
+                if (!mutation.caretStateAfter) {
+                        // Set caret position at merge/deletion point
+                        mutation.caretStateAfter = CaretState.collapsed(startBlockIndex, mutation.mergeOffset);
+                }
+
                 // Restore caret immediately using DRY helper
                 this.restoreCaretState(mutation, 'caretStateAfter');
             },
