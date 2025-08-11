@@ -9,6 +9,22 @@ class ContentManager {
     }
 
     /**
+     * DRY helper to restore caret state after DOM changes
+     * @param {Object} mutation - The mutation object containing caret state
+     * @param {string} stateKey - Key for caret state ('caretStateBefore' or 'caretStateAfter')
+     */
+    restoreCaretState(mutation, stateKey = 'caretStateBefore') {
+        const caretState = mutation[stateKey];
+        if (caretState && this.caretTracker) {
+            try {
+                this.caretTracker.restoreCaretState(caretState);
+            } catch (error) {
+                console.warn('Failed to restore caret state:', error);
+            }
+        }
+    }
+
+    /**
      * Register all content-related mutation handlers
      */
     registerHandlers() {
@@ -31,35 +47,114 @@ class ContentManager {
             },
         });
 
-        // Delete content handler (using CaretTracker for positioning)
+        // Delete content handler (handles multi-block deletion like mergeBlocks)
         this.stateManager.registerHandler('deleteContent', {
             apply: (mutation) => {
                 const { rangeCaretState } = mutation;
+                const blocks = Array.from(this.editor.children);
+                
+                const startBlockIndex = rangeCaretState.startBlockIndex;
+                const endBlockIndex = rangeCaretState.endBlockIndex;
+                const startOffset = rangeCaretState.startOffset;
+                const endOffset = rangeCaretState.endOffset;
 
-                // Convert caret state to DOM range using CaretTracker
-                const deleteRange = this.caretTracker.createRangeFromCaretState(rangeCaretState);
-                if (!deleteRange) return;
+                // Get the blocks involved
+                const startBlock = blocks[startBlockIndex];
+                const endBlock = blocks[endBlockIndex];
 
-                // Store deleted content for revert
-                mutation.deletedContents = deleteRange.cloneContents();
-                mutation.restorePosition = CaretState.collapsed(
-                    rangeCaretState.startBlockIndex, 
-                    rangeCaretState.startOffset
-                );
+                if (!startBlock || !endBlock) return;
 
-                // Delete the contents
-                deleteRange.deleteContents();
+                // Store original state for revert
+                mutation.startBlockIndex = startBlockIndex;
+                mutation.endBlockIndex = endBlockIndex;
+                mutation.startOffset = startOffset;
+                mutation.endOffset = endOffset;
+                
+                if (startBlockIndex === endBlockIndex) {
+                    // Single block deletion - simple text removal
+                    mutation.originalContent = startBlock.textContent;
+                    mutation.deletedBlocks = [];
+                    
+                    const text = startBlock.textContent;
+                    const beforeText = text.substring(0, startOffset);
+                    const afterText = text.substring(endOffset);
+                    startBlock.textContent = beforeText + afterText;
+                } else {
+                    // Multi-block deletion - merge like mergeBlocks
+                    mutation.startBlockOriginalContent = startBlock.textContent;
+                    mutation.endBlockOriginalContent = endBlock.textContent;
+                    
+                    // Store intermediate blocks for revert (similar to mergeBlocks pattern)
+                    mutation.deletedBlocks = [];
+                    for (let i = startBlockIndex + 1; i < endBlockIndex; i++) {
+                        const block = blocks[i];
+                        mutation.deletedBlocks.push({
+                            element: block,
+                            content: block.textContent,
+                            tagName: block.tagName
+                        });
+                    }
+                    
+                    // Store endBlock for reuse in revert (like mergeBlocks)
+                    mutation.removedEndBlock = endBlock;
+                    mutation.removedEndBlockContent = endBlock.textContent;
+                    
+                    // Calculate merge offset (like mergeBlocks)
+                    const startBlockRemainingText = startBlock.textContent.substring(0, startOffset);
+                    mutation.mergeOffset = startBlockRemainingText.length;
+                    
+                    // Remove intermediate blocks
+                    mutation.deletedBlocks.forEach(blockInfo => {
+                        blockInfo.element.remove();
+                    });
+                    
+                    // Merge start and end blocks (like mergeBlocks)
+                    const endBlockRemainingText = endBlock.textContent.substring(endOffset);
+                    startBlock.textContent = startBlockRemainingText + endBlockRemainingText;
+                    
+                    // Remove end block (but keep reference for revert)
+                    endBlock.remove();
+                }
+
+                // Set caret position at merge/deletion point (like mergeBlocks)
+                mutation.caretStateAfter = CaretState.collapsed(startBlockIndex, mutation.mergeOffset || startOffset);
+                
+                // Restore caret immediately using DRY helper (like mergeBlocks)
+                this.restoreCaretState(mutation, 'caretStateAfter');
             },
 
             revert: (mutation) => {
-                const { deletedContents, restorePosition } = mutation;
-
-                // Convert restore position to DOM range
-                const restoreRange = this.caretTracker.createRangeFromCaretState(restorePosition);
-                if (!restoreRange) return;
-
-                // Insert deleted contents back
-                restoreRange.insertNode(deletedContents);
+                const { 
+                    startBlockIndex, endBlockIndex, 
+                    startBlockOriginalContent, endBlockOriginalContent,
+                    originalContent, deletedBlocks, removedEndBlock
+                } = mutation;
+                
+                const blocks = Array.from(this.editor.children);
+                const startBlock = blocks[startBlockIndex];
+                
+                if (startBlockIndex === endBlockIndex) {
+                    // Single block revert
+                    startBlock.textContent = originalContent;
+                } else {
+                    // Multi-block revert (like mergeBlocks revert)
+                    // Restore original start block content
+                    startBlock.textContent = startBlockOriginalContent;
+                    
+                    // Reuse the removed end block element (like mergeBlocks)
+                    removedEndBlock.textContent = endBlockOriginalContent;
+                    
+                    // Re-insert intermediate blocks first
+                    let insertAfter = startBlock;
+                    deletedBlocks.forEach(blockInfo => {
+                        blockInfo.element.textContent = blockInfo.content;
+                        insertAfter.parentNode.insertBefore(blockInfo.element, insertAfter.nextSibling);
+                        insertAfter = blockInfo.element;
+                    });
+                    
+                    // Re-insert end block after all intermediate blocks
+                    insertAfter.parentNode.insertBefore(removedEndBlock, insertAfter.nextSibling);
+                }
             },
         });
 
