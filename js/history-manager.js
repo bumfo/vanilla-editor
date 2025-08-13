@@ -145,6 +145,10 @@ class HistoryManager {
             return;
         }
 
+        return this._pushHistory(mutation)
+    }
+
+    _pushHistory(mutation) {
         // Get current index from DOM (0 if empty)
         const currentIndex = this.currentIndex();
 
@@ -155,24 +159,14 @@ class HistoryManager {
 
         this.historyStack.push(mutation);
 
-        // Update hidden tracker
-        this.updateTracker();
+        /**
+         * Update the hidden tracker element with current index
+         * MUST use execCommand for browser to track history properly
+         */
+        this._setTracker(this.historyStack.length);
     }
 
-    /**
-     * Update the hidden tracker element with current index
-     * MUST use execCommand for browser to track history properly
-     */
-    updateTracker() {
-        if (this.isComposing) {
-            // During composition, skip tracker updates
-            return;
-        }
-
-        this.setTracker(this.historyStack.length);
-    }
-
-    setTracker(value) {
+    _setTracker(value) {
         // Save current selection to avoid interference with editor
         const selection = window.getSelection();
         let savedRange = null;
@@ -241,15 +235,13 @@ class HistoryManager {
             caretStateBefore: this.delayedMutations[0]?.caretStateBefore || null
         };
 
-        // Add composite mutation to history as single entry
-        this.historyStack.push(compositeMutation);
 
         // Clear composition state
         this.isComposing = false;
         this.delayedMutations = [];
 
-        // Update tracker once for the composite mutation
-        this.setTracker(this.historyStack.length);
+        // Add composite mutation to history as single entry
+        this._pushHistory(compositeMutation);
     }
 
     /**
